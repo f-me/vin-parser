@@ -1,0 +1,43 @@
+Name:                vin-parser
+Version:             0.1
+Synopsis:            Custom tool for transferring data from files to database.
+License:             MIT
+Author:              Timofey Cherganov
+Maintainer:          timofey@formalmethods.ru
+
+Category:            Database
+Build-type:          Simple
+
+-- Constraint on the version of Cabal needed to build this package.
+Cabal-version:       >=1.6
+
+
+-- Executable test
+--   Main-is:           test.hs
+--   
+--   Build-depends:     base, time, old-locale
+--                     ,containers, bytestring, utf8-string, text
+--                     ,enumerator
+--                     ,csv-enumerator == 0.10.*
+--                     ,hedis == 0.4.*
+  
+Library  
+  hs-source-dirs: src
+  Exposed-Modules:
+    Vin.Import
+
+  Other-Modules:
+    Vin.FieldParsers
+    Vin.Utils
+
+  Build-depends:     base, time, old-locale
+                    ,containers, bytestring, utf8-string, text
+                    ,conduit          == 0.4.*
+                    ,enumerator
+                    ,encoding         == 0.6.*
+                    ,csv-enumerator   == 0.10.*
+                    ,csv-conduit      == 0.1.*
+                    ,aeson            == 0.6.*
+                    ,xlsx-parser      == 0.0.*
+                    ,hedis            == 0.4.*
+                    ,transformers     == 0.2.*
