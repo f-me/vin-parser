@@ -3,6 +3,7 @@
 module Vin.Import where
 
 import           Control.Applicative
+import           Control.Exception
 
 import           Data.ByteString (ByteString)
 import qualified Database.Redis as R
@@ -11,13 +12,13 @@ import           Vin.Utils
 import           Vin.FieldParsers
 
 
-loadFile :: FilePath -> FilePath -> ByteString -> ByteString -> IO (Either FilePath String)
+loadFile :: FilePath -> FilePath -> ByteString -> ByteString -> IO ()
 loadFile fInput fError program contentType = do
     case program of
         "vwMotor"  -> loadVinFile vwMotor
         "vwTruck"  -> loadVinFile vwTruck
         "vwRuslan" -> loadVinFile vwTruck
-        _          -> return $ Right "unknown program"
+        _          -> throw $ VinUploadException "Неизвестная программа" Nothing
   where
     loadVinFile = f redisSetVin fInput fError
     f = case contentType of

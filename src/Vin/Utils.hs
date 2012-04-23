@@ -1,23 +1,26 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Vin.Utils where
 
 import           Control.Applicative
-import           Control.Exception (Exception, try)
+import           Control.Exception
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.UTF8 as B
 import qualified Data.Map as M
+import           Data.Typeable
 
 import           Control.Monad.IO.Class (liftIO)
+import           Data.Text (Text)
 import qualified Data.Text.Encoding as T
 import           Data.Conduit
 import           Data.Conduit.Binary
 import qualified Data.Conduit.List as CL
 import           Data.CSV.Conduit  hiding (MapRow, Row)
-import           Data.Encoding (decodeStrictByteString, encodeStrictByteString)
-import           Data.Encoding.CP1251
+-- import           Data.Encoding (decodeStrictByteString, encodeStrictByteString)
+-- import           Data.Encoding.CP1251
 import           Database.Redis as R
 
 import           Data.Xlsx.Parser
@@ -25,6 +28,12 @@ import           Data.Xlsx.Parser
 
 type Row = M.Map ByteString ByteString
 
+data VinUploadException = VinUploadException
+    { vReason   :: Text
+    , vFilePath :: Maybe FilePath
+    } deriving (Show, Typeable)
+
+instance Exception VinUploadException
 
 redisSetVin :: R.Connection -> Row -> IO ()
 redisSetVin c val
@@ -48,7 +57,7 @@ redisSetWithKey' key val = do
 loadCsvFile  store fInput fError keyMap =
     runResourceT $  sourceFile fInput
                  $= intoCSV csvSettings
-                 $= CL.map decodeCP1251
+--                 $= CL.map decodeCP1251
                  $$ sinkXFile store fError keyMap
   where
     csvSettings = defCSVSettings { csvSep = ';' }
@@ -65,11 +74,12 @@ sinkXFile :: MonadResource m
           => (Connection -> Row -> IO ())
           -> FilePath
           -> [Record]
-          -> Sink Row m (Either FilePath String)
+          -> Sink Row m ()
+--          -> Sink Row m (Either FilePath String)
 sinkXFile store fError keyMap
     =  CL.map (remap keyMap)
     =$ storeCorrect store
-    =$ CL.map encodeCP1251
+--    =$ CL.map encodeCP1251
     =$ writeIncorrect fError
 
 
@@ -89,11 +99,14 @@ storeCorrect store = conduitIO
     (const $ return [])
 
 
-writeIncorrect :: MonadResource m => FilePath -> Sink Row m (Either FilePath String)
+writeIncorrect :: MonadResource m => FilePath -> Sink Row m ()
 writeIncorrect fp = do
     res <- CL.peek
-    fp' <- writeRows fp
-    return $ maybe (Right "success") (const $ Left fp') res
+    case res of
+      Nothing -> return ()
+      Just _  -> do
+          fp' <- writeRows fp
+          throw $ VinUploadException "Ошибки при загрузке" (Just fp')
 
 
 writeRows :: MonadResource m => FilePath -> Sink Row m FilePath
@@ -110,18 +123,18 @@ encode m = M.map T.encodeUtf8 m'
     m' = M.mapKeys T.encodeUtf8 m
 
 
-encodeCP1251 :: Row -> Row
-encodeCP1251 m = M.map enc m'
-  where
-    m' = M.mapKeys enc m
-    enc bs = encodeStrictByteString CP1251 $ B.toString bs
+-- encodeCP1251 :: Row -> Row
+-- encodeCP1251 m = M.map enc m'
+--   where
+--     m' = M.mapKeys enc m
+--     enc bs = encodeStrictByteString CP1251 $ B.toString bs
 
 
-decodeCP1251 :: Row -> Row
-decodeCP1251 m = M.map enc m'
-  where
-    m' = M.mapKeys enc m
-    enc s = B.fromString $ decodeStrictByteString CP1251 s
+-- decodeCP1251 :: Row -> Row
+-- decodeCP1251 m = M.map enc m'
+--   where
+--     m' = M.mapKeys enc m
+--     enc s = B.fromString $ decodeStrictByteString CP1251 s
 
 
 remap :: [Record] -> Row -> Either Row Row
