@@ -28,6 +28,7 @@ loadFile fInput fError program contentType = do
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ->
                 loadXlsxFile
             "text/csv" -> loadCsvFile
+            _ -> throw $ VinUploadException "Неизвестный формат файла" Nothing
 
 
 vwMotor = map mkRecord

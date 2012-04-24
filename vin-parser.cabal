@@ -30,6 +30,7 @@ Library
     ,data-lens-template          == 2.1.*
     ,directory                   == 1.1.*
     ,hedis                       == 0.4.*
+    ,iconv                       == 0.4.*
     ,MonadCatchIO-transformers   >= 0.2 && < 0.4
     ,mtl                         >= 2 && < 3
     ,old-locale
