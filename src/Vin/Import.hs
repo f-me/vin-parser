@@ -1,6 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Vin.Import where
+module Vin.Import
+    ( loadFile
+    , VinUploadException(..)
+    ) where
 
 import           Control.Applicative
 import           Control.Exception
