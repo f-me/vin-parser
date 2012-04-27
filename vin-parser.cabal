@@ -17,6 +17,12 @@ Library
     Snap.Snaplet.Vin
 
   Other-Modules:
+    Vin.Field
+    Vin.Types
+    Vin.Row
+    Vin.Models
+    Vin.Text
+    
     Vin.Import
     Vin.FieldParsers
     Vin.Utils

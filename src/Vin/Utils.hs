@@ -26,6 +26,9 @@ import           Database.Redis as R
 
 import           Data.Xlsx.Parser
 
+import Data.String
+
+import Vin.Text
 
 type Row = M.Map ByteString ByteString
 
@@ -44,8 +47,8 @@ redisSetVin c val
   = runRedis c
   $ mapM_ (\k -> redisSetWithKey' (mkKey k) val) vins
   where
-    -- Внезапно оказалось, что у машины может быть два VINа.
-    -- В качестве быстрого решения, пусть записи о машине дублируются.
+    -- It seems that car can have several VINs
+    -- For now dublicate records
     vins = B.words $ val M.! "vin"
     mkKey k = B.concat ["vin:", k]
 
@@ -87,6 +90,18 @@ sinkXFile store fError keyMap
     =$ writeIncorrect fError
 
 
+sinkXFile'
+    :: MonadResource m
+    => (Connection -> Row -> IO ())
+    -> FilePath
+    -> TextModel
+    -> Sink Row m ()
+sinkXFile' store fError textModel
+    =  CL.map (parse textModel)
+    =$ storeCorrect' textModel store
+    -- =$ CL.map encodeCP1251'
+    =$ writeIncorrect' fError
+
 storeCorrect :: MonadResource m
              => (R.Connection -> Row -> IO ())
              -> Conduit (Either Row Row) m Row
@@ -102,6 +117,21 @@ storeCorrect store = conduitIO
     )
     (const $ return [])
 
+storeCorrect'
+    :: MonadResource m
+    => TextModel
+    -> (R.Connection -> Row -> IO ())
+    -> Conduit (Either [RowError ByteString TypeError] [ByteString]) m [RowError ByteString TypeError]
+storeCorrect' textModel store = conduitIO
+    (R.connect R.defaultConnectInfo)
+    (\conn -> runRedis conn quit >> return ())
+    (\conn row -> case row of
+        Right r -> do
+            liftIO $ store conn (M.fromList $ zip (map (fromString . fst) (modelFields textModel)) r)
+            return $ IOProducing []
+        Left r -> return $ IOProducing [r])
+    (const $ return [])
+
 
 writeIncorrect :: MonadResource m => FilePath -> Sink Row m ()
 writeIncorrect fp = do
@@ -110,8 +140,18 @@ writeIncorrect fp = do
       Nothing -> return ()
       Just _  -> do
           fp' <- writeRows fp
-          throw $ VinUploadException "Ошибки при загрузке" (Just fp')
+          throw $ VinUploadException "Errors during load: " (Just fp')
 
+
+writeIncorrect'
+    :: MonadResource m
+    => FilePath
+    -> Sink [RowError ByteString TypeError] m ()
+writeIncorrect' fp = do
+    res <- CL.peek
+    case res of
+        Nothing -> return ()
+        Just _ -> undefined
 
 writeRows :: MonadResource m => FilePath -> Sink Row m FilePath
 writeRows fp
@@ -120,12 +160,16 @@ writeRows fp
   where
     csvSettings = defCSVSettings { csvOutputColSep = ';' }
 
+writeRows'
+    :: MonadResource m
+    => FilePath
+    -> Sink [RowError ByteString TypeError] m FilePath
+writeRows' fp = undefined
 
 encode :: MapRow -> Row
 encode m = M.map T.encodeUtf8 m'
   where
     m' = M.mapKeys T.encodeUtf8 m
-
 
 encodeCP1251 :: Row -> Row
 encodeCP1251 m = M.map enc m'
