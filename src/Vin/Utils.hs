@@ -89,6 +89,13 @@ sinkXFile store fError keyMap
     =$ CL.map encodeCP1251
     =$ writeIncorrect fError
 
+parseRow
+    :: TextModel
+    -> Row
+    -> Either (Row, [RowError ByteString TypeError]) Row
+parseRow m r = case parse m r of
+    Left e -> Left (r, e)
+    Right s -> Right $ M.fromList $ zip (map (fromString . fst) (modelFields m)) s
 
 sinkXFile'
     :: MonadResource m
@@ -97,10 +104,10 @@ sinkXFile'
     -> TextModel
     -> Sink Row m ()
 sinkXFile' store fError textModel
-    =  CL.map (parse textModel)
+    =  CL.map (parseRow textModel)
     =$ storeCorrect' textModel store
-    -- =$ CL.map encodeCP1251'
-    =$ writeIncorrect' fError
+    =$ CL.map (encodeCP1251 . fst)
+    =$ writeIncorrect fError
 
 storeCorrect :: MonadResource m
              => (R.Connection -> Row -> IO ())
@@ -121,13 +128,13 @@ storeCorrect'
     :: MonadResource m
     => TextModel
     -> (R.Connection -> Row -> IO ())
-    -> Conduit (Either [RowError ByteString TypeError] [ByteString]) m [RowError ByteString TypeError]
+    -> Conduit (Either a Row) m a
 storeCorrect' textModel store = conduitIO
     (R.connect R.defaultConnectInfo)
     (\conn -> runRedis conn quit >> return ())
     (\conn row -> case row of
         Right r -> do
-            liftIO $ store conn (M.fromList $ zip (map (fromString . fst) (modelFields textModel)) r)
+            liftIO $ store conn r
             return $ IOProducing []
         Left r -> return $ IOProducing [r])
     (const $ return [])
@@ -143,15 +150,6 @@ writeIncorrect fp = do
           throw $ VinUploadException "Errors during load: " (Just fp')
 
 
-writeIncorrect'
-    :: MonadResource m
-    => FilePath
-    -> Sink [RowError ByteString TypeError] m ()
-writeIncorrect' fp = do
-    res <- CL.peek
-    case res of
-        Nothing -> return ()
-        Just _ -> undefined
 
 writeRows :: MonadResource m => FilePath -> Sink Row m FilePath
 writeRows fp
@@ -159,12 +157,6 @@ writeRows fp
     =$ sinkFile fp >> return fp
   where
     csvSettings = defCSVSettings { csvOutputColSep = ';' }
-
-writeRows'
-    :: MonadResource m
-    => FilePath
-    -> Sink [RowError ByteString TypeError] m FilePath
-writeRows' fp = undefined
 
 encode :: MapRow -> Row
 encode m = M.map T.encodeUtf8 m'
