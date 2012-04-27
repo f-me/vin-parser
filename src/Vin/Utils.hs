@@ -69,6 +69,19 @@ loadCsvFile  store fInput fError keyMap =
   where
     csvSettings = defCSVSettings { csvSep = ';' }
 
+loadCsvFile'
+    :: (Connection -> Row -> IO ())
+    -> FilePath
+    -> FilePath
+    -> TextModel
+    -> IO ()
+loadCsvFile' store fInput fError textModel = runResourceT
+    $  sourceFile fInput
+    $= intoCSV csvSettings
+    $= CL.map decodeCP1251
+    $$ sinkXFile' store fError textModel
+    where
+        csvSettings = defCSVSettings { csvSep = ';' }
 
 loadXlsxFile store fInput fError keyMap = do
     x <- xlsx fInput
@@ -76,6 +89,19 @@ loadXlsxFile store fInput fError keyMap = do
                  $= CL.map encode
                  $$ sinkXFile store fError keyMap
 
+
+loadXlsxFile'
+    :: (Connection -> Row -> IO ())
+    -> FilePath
+    -> FilePath
+    -> TextModel
+    -> IO ()
+loadXlsxFile' store fInput fError textModel = do
+    x <- xlsx fInput
+    runResourceT
+        $  sheetRows x 0
+        $= CL.map encode
+        $$ sinkXFile' store fError textModel
 
 sinkXFile :: MonadResource m
           => (Connection -> Row -> IO ())
