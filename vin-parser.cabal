@@ -22,6 +22,7 @@ Library
     Vin.Row
     Vin.Models
     Vin.Text
+    Vin.Load
     
     Vin.Import
     Vin.FieldParsers

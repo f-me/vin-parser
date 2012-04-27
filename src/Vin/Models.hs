@@ -1,5 +1,7 @@
 module Vin.Models (
-    ford
+    ford,
+
+    module Vin.Text
     ) where
 
 import Vin.Text
