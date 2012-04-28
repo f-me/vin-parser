@@ -58,7 +58,7 @@ importModel
     -- ^ Content type
     -> IO ()
 
-importModel models ls from failed program content = do
+importModel ms ls from failed program content = do
     loader <- try (M.lookup content ls) $ "Unknown loader"
-    m <- try (find ((== program) . modelProgram) models) $ "Unknown program"
-    runResourceT $ (loader from $$ sinkXFile' redisSetVin failed m)
+    m <- try (find ((== program) . modelProgram) ms) $ "Unknown program"
+    runResourceT $ (loader from $$ sinkXFile redisSetVin failed m)

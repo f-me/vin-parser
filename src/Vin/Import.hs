@@ -16,7 +16,9 @@ import           Vin.FieldParsers
 
 
 loadFile :: FilePath -> FilePath -> ByteString -> ByteString -> IO ()
-loadFile fInput fError program contentType = do
+loadFile fInput fError program contentType = undefined
+{-
+do
     case program of
         "vwMotor"  -> loadVinFile vwMotor
         "vwTruck"  -> loadVinFile vwTruck
@@ -29,8 +31,9 @@ loadFile fInput fError program contentType = do
                 loadXlsxFile
             "text/csv" -> loadCsvFile
             _ -> throw $ VinUploadException "Неизвестный формат файла" Nothing
+-}
 
-
+{-
 vwMotor = map mkRecord
   [("program",      fixed "vwMotor")
   ,("make",         fixed "VW")
@@ -136,3 +139,5 @@ fordPlus = map mkRecord
   ,("lastTODate",   date ["Дата прохождения ТО"])
   ,("mileageTO",    str  ["Пробег на момент прохождения ТО"])
   ]
+
+-}

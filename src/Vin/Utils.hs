@@ -41,7 +41,6 @@ data VinUploadException = VinUploadException
 
 instance Exception VinUploadException
 
-
 redisSetVin :: R.Connection -> Row -> IO ()
 redisSetVin c val
   = runRedis c
@@ -61,59 +60,32 @@ redisSetWithKey' key val = do
     _ -> return ()
 
 
-loadCsvFile  store fInput fError keyMap =
-    runResourceT $  sourceFile fInput
-                 $= intoCSV csvSettings
-                 $= CL.map decodeCP1251
-                 $$ sinkXFile store fError keyMap
-  where
-    csvSettings = defCSVSettings { csvSep = ';' }
-
-loadCsvFile'
+loadCsvFile
     :: (Connection -> Row -> IO ())
     -> FilePath
     -> FilePath
     -> TextModel
     -> IO ()
-loadCsvFile' store fInput fError textModel = runResourceT
+loadCsvFile store fInput fError textModel = runResourceT
     $  sourceFile fInput
     $= intoCSV csvSettings
     $= CL.map decodeCP1251
-    $$ sinkXFile' store fError textModel
+    $$ sinkXFile store fError textModel
     where
         csvSettings = defCSVSettings { csvSep = ';' }
 
-loadXlsxFile store fInput fError keyMap = do
-    x <- xlsx fInput
-    runResourceT $  sheetRows x 0
-                 $= CL.map encode
-                 $$ sinkXFile store fError keyMap
-
-
-loadXlsxFile'
+loadXlsxFile
     :: (Connection -> Row -> IO ())
     -> FilePath
     -> FilePath
     -> TextModel
     -> IO ()
-loadXlsxFile' store fInput fError textModel = do
+loadXlsxFile store fInput fError textModel = do
     x <- xlsx fInput
     runResourceT
         $  sheetRows x 0
         $= CL.map encode
-        $$ sinkXFile' store fError textModel
-
-sinkXFile :: MonadResource m
-          => (Connection -> Row -> IO ())
-          -> FilePath
-          -> [Record]
-          -> Sink Row m ()
---          -> Sink Row m (Either FilePath String)
-sinkXFile store fError keyMap
-    =  CL.map (remap keyMap)
-    =$ storeCorrect store
-    =$ CL.map encodeCP1251
-    =$ writeIncorrect fError
+        $$ sinkXFile store fError textModel
 
 parseRow
     :: TextModel
@@ -123,39 +95,24 @@ parseRow m r = case parse m r of
     Left e -> Left (r, e)
     Right s -> Right $ M.fromList $ zip (map (fromString . fst) (modelFields m)) s
 
-sinkXFile'
+sinkXFile
     :: MonadResource m
     => (Connection -> Row -> IO ())
     -> FilePath
     -> TextModel
     -> Sink Row m ()
-sinkXFile' store fError textModel
+sinkXFile store fError textModel
     =  CL.map (parseRow textModel)
-    =$ storeCorrect' textModel store
+    =$ storeCorrect textModel store
     =$ CL.map (encodeCP1251 . fst)
     =$ writeIncorrect fError
 
-storeCorrect :: MonadResource m
-             => (R.Connection -> Row -> IO ())
-             -> Conduit (Either Row Row) m Row
-storeCorrect store = conduitIO
-    (R.connect R.defaultConnectInfo)
-    (\conn -> runRedis conn quit >> return ())
-    (\conn row ->
-         case row of
-           Right r -> do
-                        liftIO $ store conn r
-                        return $ IOProducing []
-           Left r  -> return $ IOProducing [r]
-    )
-    (const $ return [])
-
-storeCorrect'
+storeCorrect
     :: MonadResource m
     => TextModel
     -> (R.Connection -> Row -> IO ())
     -> Conduit (Either a Row) m a
-storeCorrect' textModel store = conduitIO
+storeCorrect textModel store = conduitIO
     (R.connect R.defaultConnectInfo)
     (\conn -> runRedis conn quit >> return ())
     (\conn row -> case row of
@@ -174,7 +131,6 @@ writeIncorrect fp = do
       Just _  -> do
           fp' <- writeRows fp
           throw $ VinUploadException "Errors during load: " (Just fp')
-
 
 
 writeRows :: MonadResource m => FilePath -> Sink Row m FilePath
@@ -201,51 +157,3 @@ decodeCP1251 m = M.map enc m'
   where
     m' = M.mapKeys enc m
     enc s = B.concat . L.toChunks . convert "CP1251" "UTF-8" $ L.fromChunks [s]
-
-
-remap :: [Record] -> Row -> Either Row Row
-remap rs row =
-    case getErrors row' of
-      Left  es  -> Left $ M.insert "Error" (B.unwords es) row
-      Right res -> Right res
-  where
-    row' = remap' rs row
-
-
-remap' :: [Record] -> Row -> [(ByteString, Either ByteString ByteString)]
-remap' rs row = foldl f [] rs
-  where
-    f res record =
-        let k   = rKey record
-            g   = rFind record
-            val = g row
-        in (k, val) : res
-
-
-getErrors :: [(ByteString, Either ByteString ByteString)]
-          -> Either [ByteString] Row
-getErrors row = M.fromList <$> foldl f (Right []) row
-  where
-    f err@(Left res) (_, val) =
-        case val of
-          Right _ -> err
-          Left  e -> Left (e : res)
-    f (Right res) (k, val) =
-        case val of
-          Right s -> Right $ (k, s) : res
-          Left  e -> Left [e]
-
-
-showMap :: Row -> ByteString
-showMap = B.unlines . map showKV . M.toList
-    where
-      showKV (k,v) = B.concat ["\t", k, ": ", v]
-
-
-data Record = Record
-    { rKey  :: ByteString
-    , rFind :: Row -> Either ByteString ByteString
-    }
-
-
-mkRecord (k, f) = Record k f

@@ -34,7 +34,7 @@ instance Err [Char] where
   err a = err a . B.fromString
 
 instance Err (M.Map ByteString ByteString) where
-  err a = err a . showMap
+  err a = undefined
 
 
 
