@@ -21,6 +21,7 @@ Library
     Vin.Row
     Vin.Text
     Vin.Model
+    Vin.ModelField
     Vin.Models
     Vin.Utils
     Vin.Load

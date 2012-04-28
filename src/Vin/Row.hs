@@ -1,12 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- | Module for row processing.
--- The main goal is that processing of every field main fail,
--- but processing of row is Applicative, so it can collect all
--- errors instead of failing on first invalid field.
+-- The main goal is that processing of every field may fail,
+-- but processing of row is Applicative (and Alternative),
+-- so you can't sequence actions on row.
+-- Combined row action can collect all errors instead of failing
+-- on first invalid field.
+-- 
 -- For example, this code:
 -- > (,) <$> column "key" string <*> column "value" int
 -- will try to convert `value' field even if first field fail
--- But, of course, final result will be Nothing.
+-- But, of course, final result will be Nothing
+-- 
+-- To process list of fields you can use sequenceA
+-- > sequenceA [column "key" string, column "value" int, ...]
 module Vin.Row (
     RowError(..),
     Row,

@@ -1,14 +1,18 @@
+-- | Module for textual fields
 module Vin.Text (
     TextField, Text,
     TypeError(..),
-    string, int,
+    string, upperString, int,
     table, (<<~)
     ) where
 
+import Control.Applicative
 import Control.Monad.Error
 
 import Data.ByteString (ByteString)
 import qualified  Data.ByteString.Char8 as C8
+
+import Data.Char (toUpper)
 
 import qualified Data.Map as M
 
@@ -29,8 +33,12 @@ instance Error TypeError where
     strMsg = InvalidType
 
 -- | String field
-string :: Error e => Field e  ByteString ByteString
+string :: Error e => Field e ByteString ByteString
 string = field
+
+-- | Uppercased string
+upperString :: Error e => Field e ByteString ByteString
+upperString = C8.map toUpper <$> string
 
 -- | Field with integer, just verify value
 int :: Error e => Field e ByteString ByteString

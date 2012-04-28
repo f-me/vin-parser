@@ -1,3 +1,4 @@
+-- | Module with model definition and parse function
 module Vin.Model (
     Model(..),
     model,

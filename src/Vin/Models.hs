@@ -1,22 +1,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | Module with model definitions
 module Vin.Models (
     ford,
 
     models
     ) where
 
-import Control.Applicative (pure)
-
-import Vin.Text
 import Vin.Model
+import Vin.ModelField
 
 ford :: Model
 ford = model "ford" "FORD" [
-    ("program", pure "ford"),
-    ("make", pure "FORD"),
-    ("model", "MODEL" ~:: string),
-    ("arcModelCode", "ARC_MODEL_CODE" ~:: string)]
+    program "ford",
+    make "FORD",
+    arcModelCode "ARC_MODEL_CODE",
+    ffdsId "FFDS_ID",
+    vin "VIN_NUMBER",
+    dealerCode "DEALER_CODE",
+    dealerName "DEALER_NAME"]
 
 models :: [Model]
 models = [ford]

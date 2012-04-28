@@ -1,6 +1,16 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 
 -- | Module for field processing
+-- Field is Monad, MonadPlus and MonadError,
+-- so you can perform any sequenced failable actions
+-- @
+-- example = do
+--     s <- field -- get field value
+--     x <- f s -- perform some actions
+--     when (p x) $
+--         throwError (strMsg "Error")
+--     return x
+-- @
 module Vin.Field (
     Field(..),
     field, verify, alt
