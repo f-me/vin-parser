@@ -60,33 +60,6 @@ redisSetWithKey' key val = do
     _ -> return ()
 
 
-loadCsvFile
-    :: (Connection -> Row -> IO ())
-    -> FilePath
-    -> FilePath
-    -> TextModel
-    -> IO ()
-loadCsvFile store fInput fError textModel = runResourceT
-    $  sourceFile fInput
-    $= intoCSV csvSettings
-    $= CL.map decodeCP1251
-    $$ sinkXFile store fError textModel
-    where
-        csvSettings = defCSVSettings { csvSep = ';' }
-
-loadXlsxFile
-    :: (Connection -> Row -> IO ())
-    -> FilePath
-    -> FilePath
-    -> TextModel
-    -> IO ()
-loadXlsxFile store fInput fError textModel = do
-    x <- xlsx fInput
-    runResourceT
-        $  sheetRows x 0
-        $= CL.map encode
-        $$ sinkXFile store fError textModel
-
 parseRow
     :: TextModel
     -> Row

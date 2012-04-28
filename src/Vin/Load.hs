@@ -12,6 +12,9 @@ import Data.List
 import qualified Data.Map as M
 import Data.CSV.Conduit hiding (Row, MapRow)
 
+import Database.Redis
+import qualified Data.Xlsx.Parser as Xlsx
+
 import Vin.Models
 import Vin.Utils
 
@@ -62,3 +65,20 @@ importModel ms ls from failed program content = do
     loader <- try (M.lookup content ls) $ "Unknown loader"
     m <- try (find ((== program) . modelProgram) ms) $ "Unknown program"
     runResourceT $ (loader from $$ sinkXFile redisSetVin failed m)
+
+-- Old functions:
+
+loadXlsxFile
+    :: (Connection -> Row -> IO ())
+    -> FilePath
+    -> FilePath
+    -> TextModel
+    -> IO ()
+loadXlsxFile store fInput fError textModel = do
+    x <- Xlsx.xlsx fInput
+    runResourceT
+        $  Xlsx.sheetRows x 0
+        $= CL.map encode
+        $$ sinkXFile store fError textModel
+
+
