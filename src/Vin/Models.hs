@@ -1,17 +1,22 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Vin.Models (
     ford,
 
-    models,
-
-    module Vin.Text
+    models
     ) where
 
-import Vin.Text
+import Control.Applicative (pure)
 
-ford :: TextModel
+import Vin.Text
+import Vin.Model
+
+ford :: Model
 ford = model "ford" "FORD" [
+    ("program", pure "ford"),
+    ("make", pure "FORD"),
     ("model", "MODEL" ~:: string),
     ("arcModelCode", "ARC_MODEL_CODE" ~:: string)]
 
-models :: [TextModel]
+models :: [Model]
 models = [ford]

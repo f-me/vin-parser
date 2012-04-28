@@ -3,7 +3,7 @@
 -- | Module for field processing
 module Vin.Field (
     Field(..),
-    field, verify
+    field, verify, alt
     ) where
 
 import Control.Monad
@@ -30,7 +30,7 @@ instance Error e => MonadError e (Field e s) where
 
 instance Error e => MonadPlus (Field e s) where
     mzero = throwError noMsg
-    l `mplus` r = l `catchError` (\e -> r)
+    l `mplus` r = l `catchError` (const r)
 
 -- | Verify field value
 verify :: Error e => (a -> Bool) -> (s -> e) -> Field e s a -> Field e s a
@@ -40,3 +40,9 @@ verify p msg f = do
     if p x
         then return x
         else throwError (msg s)
+
+-- | Try alternatives
+-- Returns result of first succeeded alternative, or fails
+-- with message specified
+alt :: Error e => e -> [Field e a v] -> Field e a v
+alt msg lst = foldr mplus mzero lst `catchError` (const $ throwError msg)

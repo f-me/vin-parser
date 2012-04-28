@@ -18,15 +18,14 @@ Library
 
   Other-Modules:
     Vin.Field
-    Vin.Types
     Vin.Row
-    Vin.Models
     Vin.Text
-    Vin.Load
-    
-    Vin.Import
-    Vin.FieldParsers
+    Vin.Model
+    Vin.Models
     Vin.Utils
+    Vin.Load
+    Vin.Store
+    Vin.Import
 
   Build-depends:
      aeson                       == 0.6.*

@@ -15,7 +15,6 @@ module Vin.Row (
     ) where
 
 import Control.Applicative
-import Control.Monad
 import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.Writer
@@ -45,6 +44,13 @@ instance Applicative (Row k e a) where
         f' <- runRow f
         x' <- runRow x
         return (f' <*> x')
+
+instance Alternative (Row k e a) where
+    empty = Row $ return Nothing
+    l <|> r = Row $ do
+        l' <- runRow l
+        r' <- runRow r
+        return (l' <|> r')        
 
 -- | Process field at column
 -- Collect errors from fields processing
