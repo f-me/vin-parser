@@ -13,9 +13,10 @@
 -- @
 module Vin.Field (
     Field(..),
-    field, verify, alt
+    field, verify, alt, optional, withDefault
     ) where
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Error
 import Control.Monad.Reader
@@ -42,6 +43,14 @@ instance Error e => MonadPlus (Field e s) where
     mzero = throwError noMsg
     l `mplus` r = l `catchError` (const r)
 
+instance Error e => Applicative (Field e s) where
+    pure = Field . pure
+    f <*> g = Field $ (runField f <*> runField g)
+
+instance Error e => Alternative (Field e s) where
+    empty = Field empty
+    f <|> g = Field $ (runField f <|> runField g)
+
 -- | Verify field value
 verify :: Error e => (a -> Bool) -> (s -> e) -> Field e s a -> Field e s a
 verify p msg f = do
@@ -56,3 +65,7 @@ verify p msg f = do
 -- with message specified
 alt :: Error e => e -> [Field e a v] -> Field e a v
 alt msg lst = foldr mplus mzero lst `catchError` (const $ throwError msg)
+
+-- | Parse with default
+withDefault :: Error e => v -> Field e a v -> Field e a v
+withDefault d f = f <|> pure d

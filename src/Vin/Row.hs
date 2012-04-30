@@ -26,6 +26,7 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 
 import qualified Data.Map as M
+import Data.List (nub)
 
 import Vin.Field
 
@@ -36,10 +37,10 @@ newtype Row k e a v = Row {
     runRow :: ReaderT (M.Map k a) (Writer [RowError k e]) (Maybe v) }
 
 -- | Execute row
-row :: M.Map k a -> Row k e a v -> Either [RowError k e] v
+row :: (Eq k, Eq e) => M.Map k a -> Row k e a v -> Either [RowError k e] v
 row m r = case runWriter (runReaderT (runRow r) m) of
     (Just x, _) -> Right x
-    (Nothing, es) -> Left es
+    (Nothing, es) -> Left $ nub es
 
 instance Functor (Row k e a) where
     fmap f = Row . fmap (fmap f) . runRow

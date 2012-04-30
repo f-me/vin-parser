@@ -20,6 +20,8 @@ Library
     Vin.Field
     Vin.Row
     Vin.Text
+    Vin.Text.DateTime
+    Vin.Text.Specific
     Vin.Model
     Vin.ModelField
     Vin.Models
@@ -39,6 +41,7 @@ Library
     ,directory                   == 1.1.*
     ,ghc-prim                    == 0.2.*
     ,hedis                       == 0.4.*
+    ,email-validate              == 0.2.*
     ,iconv                       == 0.4.*
     ,MonadCatchIO-transformers   >= 0.2 && < 0.4
     ,mtl                         >= 2 && < 3
