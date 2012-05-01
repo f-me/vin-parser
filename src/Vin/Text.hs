@@ -17,9 +17,9 @@ import Control.Monad.Error
 import Data.ByteString (ByteString)
 import qualified  Data.ByteString.Char8 as C8
 
-import Data.Char (toUpper)
+import Data.Char (toUpper, isSpace)
 
-import Data.List (intercalate)
+import Data.List (intercalate, reverse, dropWhile)
 import qualified Data.Map as M
 
 import Text.Email.Validate (isValid)
@@ -41,9 +41,10 @@ instance Error TypeError where
     noMsg = InvalidType ""
     strMsg = InvalidType
 
--- | String field
+-- | String field, trimmed
 string :: Error e => Field e ByteString ByteString
-string = field
+string = withString (p . p) <$> field where
+    p = reverse . dropWhile isSpace
 
 -- | Uppercased string
 upperString :: Error e => Field e ByteString ByteString
@@ -51,14 +52,21 @@ upperString = withString (map toUpper) <$> string
 
 -- | Field with integer, just verify value
 int :: Error e => Field e ByteString ByteString
-int = verify checkInt failInt string where
-    checkInt = maybe False (C8.null . snd) . C8.readInt
-    failInt s = strMsg $ "Unable to convert field " ++ decodeString s ++ " to type Int"
+int = do
+    s <- string
+    let
+        validInt = matchInt $ reads $ decodeString s
+        matchInt :: [(Int, String)] -> Bool
+        matchInt [(_, tl)] = all isSpace tl
+        matchInt _ = False
+    when (not validInt) $
+        throwError $ strMsg $ "Unable to convert field " ++ decodeString s ++ " to int"
+    return s
 
 -- | Value from table
 table :: Error e => M.Map ByteString ByteString -> Field e ByteString ByteString
 table t = do
-    s <- field
+    s <- string
     case M.lookup s t of
         Nothing -> throwError $ strMsg $ "Can't find any matches in table for " ++ decodeString s
         Just v -> return v
@@ -72,9 +80,10 @@ result <<~ synonims = M.fromList $ zip rs s where
 -- | Value is one of
 oneOf :: Error e => [String] -> Field e ByteString ByteString
 oneOf lst = do
-    s <- field
+    s <- string
     when (not (decodeString s `elem` lst)) $
-        throwError $ strMsg $ "Value must be one of: " ++ intercalate ", " lst
+        throwError $ strMsg $
+            "Expecting value one of [" ++ intercalate ", " lst ++ "], but got " ++ decodeString s
     return s
 
 -- | Alternatives

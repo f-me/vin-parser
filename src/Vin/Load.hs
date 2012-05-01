@@ -3,8 +3,6 @@ module Vin.Load (
     Loader, loaders
     ) where
 
-import qualified Codec.Text.IConv as IConv
-
 import Data.Conduit
 import Data.Conduit.Binary
 import qualified Data.Conduit.List as CL

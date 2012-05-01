@@ -4,7 +4,6 @@ module Vin.Text.String (
 
 import Data.ByteString (ByteString)
 
-import qualified Codec.Text.IConv as IConv
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as E
 

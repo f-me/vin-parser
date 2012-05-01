@@ -8,7 +8,6 @@ import Vin.Text
 
 types :: M.Map String (TextField ByteString)
 types = M.fromList [
-    ("color", color),
     ("date", time),
     ("int", int),
     ("string", string),
