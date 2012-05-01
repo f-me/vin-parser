@@ -2,6 +2,7 @@
 module Vin.Text (
     TextField, Text,
     TypeError(..),
+    decodeString, encodeString, withString,
     string, upperString, int,
     table, (<<~), oneOf,
     alt, optional, withDefault,
@@ -21,10 +22,9 @@ import Data.Char (toUpper)
 import Data.List (intercalate)
 import qualified Data.Map as M
 
-import Data.String
-
 import Text.Email.Validate (isValid)
 
+import Vin.Text.String
 import Vin.Text.DateTime
 import Vin.Row
 import Vin.Field hiding (alt)
@@ -47,33 +47,33 @@ string = field
 
 -- | Uppercased string
 upperString :: Error e => Field e ByteString ByteString
-upperString = C8.map toUpper <$> string
+upperString = withString (map toUpper) <$> string
 
 -- | Field with integer, just verify value
 int :: Error e => Field e ByteString ByteString
 int = verify checkInt failInt string where
     checkInt = maybe False (C8.null . snd) . C8.readInt
-    failInt s = strMsg $ "Unable to convert field " ++ C8.unpack s ++ " to type Int"
+    failInt s = strMsg $ "Unable to convert field " ++ decodeString s ++ " to type Int"
 
 -- | Value from table
 table :: Error e => M.Map ByteString ByteString -> Field e ByteString ByteString
 table t = do
     s <- field
     case M.lookup s t of
-        Nothing -> throwError $ strMsg $ "Can't find any matches in table for " ++ C8.unpack s
+        Nothing -> throwError $ strMsg $ "Can't find any matches in table for " ++ decodeString s
         Just v -> return v
     
 -- | Table matching
 (<<~) :: String -> [String] -> M.Map ByteString ByteString
-result <<~ synonims = M.fromList $ zip s rs where
-    s = map fromString synonims
-    rs = map fromString $ repeat result
+result <<~ synonims = M.fromList $ zip rs s where
+    s = map encodeString synonims
+    rs = map encodeString $ repeat result
 
 -- | Value is one of
 oneOf :: Error e => [String] -> Field e ByteString ByteString
 oneOf lst = do
     s <- field
-    when (not (C8.unpack s `elem` lst)) $
+    when (not (decodeString s `elem` lst)) $
         throwError $ strMsg $ "Value must be one of: " ++ intercalate ", " lst
     return s
 
@@ -102,5 +102,5 @@ phone = string
 email :: Error e => Field e ByteString ByteString
 email = do
     s <- string
-    when (not (isValid (C8.unpack s))) $ throwError $ strMsg "Invalid e-mail format"
+    when (not (isValid $ decodeString s)) $ throwError $ strMsg $ "Invalid e-mail format: " ++ decodeString s
     return s

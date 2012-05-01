@@ -11,6 +11,7 @@ module Snap.Snaplet.Vin
 import           Prelude hiding (catch)
 import           Control.Applicative
 import           Control.Concurrent
+import Control.Concurrent.MVar
 import qualified Control.Exception as E
 import           Control.Monad.IO.Class
 import           Data.ByteString (ByteString)
@@ -34,152 +35,161 @@ import           System.Posix.Files (createLink, removeLink)
 
 import           Vin.Import
 
-
-data Alert a = Alert
-    { alertId        :: a
-    , alertType      :: Text
-    , alertMessage   :: Text
-    , alertVinFile   :: ByteString
-    , alertErrorFile :: Maybe FilePath
-    } deriving (Show, Eq, Generic)
-
+data Alert a = Alert {
+    alertId :: a,
+    alertType :: Text,
+    alertMessage :: Text,
+    alertVinFile :: ByteString,
+    alertErrorFile :: Maybe FilePath,
+    alertErrorLogFile :: Maybe FilePath  }
+        deriving (Eq, Ord, Read, Show, Generic)
 
 instance ToJSON a => ToJSON (Alert a)
 
-
 newtype Alerts a = Alerts (Map a (Alert a))
 
-
 instance ToJSON a => ToJSON (Alerts a) where
-    toJSON (Alerts m) = object [("alerts", as)]
-        where
-          as = toJSON $ M.foldrWithKey f [] m
-          f k v res = v { alertId = k } : res
-
+    toJSON (Alerts m) = object [("alerts", alerts')] where
+        alerts' = toJSON $ M.elems m
 
 insertAlert :: Ord a => Alert a -> Alerts a -> Alerts a
-insertAlert a (Alerts m) =
-    Alerts $ M.insert (alertId a) a m
-
-
+insertAlert a (Alerts m) = Alerts $ M.insert (alertId a) a m
 
 updateAlert :: Ord a => Alert a -> Alerts a -> Alerts a
-updateAlert a (Alerts m) =
-    Alerts $ M.update (const $ Just a) (alertId a) m
-
+updateAlert a (Alerts m) = Alerts $ M.update (const $ Just a) (alertId a) m
 
 deleteAlert :: Ord a => a -> Alerts a -> Alerts a
-deleteAlert k (Alerts m) =
-    Alerts $ M.delete k m
-
+deleteAlert k (Alerts m) = Alerts $ M.delete k m
 
 ------------------------------------------------------------------------------
-data Vin = Vin
-    { _alerts :: MVar (Alerts ByteString)
-    }
-
+data Vin = Vin {
+    _alerts :: MVar (Alerts ByteString) }
 
 makeLens ''Vin
 
+withAlerts :: MVar a -> (a -> a) -> IO ()
+withAlerts m f = modifyMVar_ m (return . f)
 
-modifyMVar' :: MVar a -> (a -> a) -> IO ()
-modifyMVar' m f =
-    modifyMVar_ m (return . f)
+alertInsert :: Ord a => MVar (Alerts a) -> Alert a -> IO ()
+alertInsert mvar a = withAlerts mvar (insertAlert a)
 
+alertUpdate :: Ord a => MVar (Alerts a) -> Alert a -> IO ()
+alertUpdate mvar a = withAlerts mvar (updateAlert a)
+
+alertDelete :: Ord a => MVar (Alerts a) -> a -> IO ()
+alertDelete mvar k = withAlerts mvar (deleteAlert k)
+
+-- | Generic alert
+alert :: Text -> a -> Text -> ByteString -> Alert a
+alert t i msg vinFile = Alert i t msg vinFile Nothing Nothing
+
+-- | Info alert
+infoAlert :: a -> Text -> ByteString -> Alert a
+infoAlert = alert "info"
+
+-- | Success alert
+successAlert :: a -> Text -> ByteString -> Alert a
+successAlert = alert "success"
+
+-- | Error alert
+errorAlert :: a -> Text -> ByteString -> Alert a
+errorAlert = alert "error"
+
+-- | Add error file to alert
+withErrorFile :: Alert a -> FilePath -> Alert a
+withErrorFile a f = a { alertErrorFile = Just f }
+
+-- | Add error log file to alert
+withErrorLogFile :: Alert a -> FilePath -> Alert a
+withErrorLogFile a f = a { alertErrorLogFile = Just f }
 
 ------------------------------------------------------------------------------
 -- | Upload file with VIN numbers.
 upload :: Handler b Vin ()
 upload = ifTop $ do
     d <- liftIO $ getTemporaryDirectory
-
     handleFileUploads d defaultUploadPolicy partUploadPolicy handler
-      `catch` (writeText . fileUploadExceptionReason)
-
-  where
-    partUploadPolicy _ = allowWithMaximumSize $ 100 * 2^(20::Int)
-
-    handler []        = writeBS "no files"
-    handler ((info,f):_) = do
-        program <- fromMaybe "" <$> getParam "program"
-
-        either (writeText . policyViolationExceptionReason)
-               (action program info)
-               f
-
+        `catch` (writeText . fileUploadExceptionReason)
+    where
+        partUploadPolicy _ = allowWithMaximumSize $ 100 * 2 ^ (20 :: Int)
+        
+        handler [] = writeBS "no files"
+        handler ((info, f):_) = do
+            program <- fromMaybe "" <$> getParam "program"
+            either
+                (writeText . policyViolationExceptionReason)
+                (action program info)
+                f
 
 action :: ByteString -> PartInfo -> String -> Handler b Vin ()
 action program info f = do
     liftIO $ createLink f f'
-
     s <- gets _alerts
+    let partF = fromMaybe "" $ partFileName info
+    liftIO $ do
+        alertInsert s $ infoAlert (B.pack f) "Uploading..." partF
+    
+    statsVar <- liftIO $ newMVar (0, 0)
 
-    let a = Alert (B.pack f)
-                  "info"
-                  "обработка..."
-                  (fromMaybe "" $ partFileName info)
-                  Nothing
-
-    liftIO $ modifyMVar' s $ insertAlert a
-
+    let
+        uploadStats :: Int -> Int -> IO ()
+        uploadStats total valid = do
+            swapMVar statsVar (total, valid)
+            alertUpdate s $ infoAlert (B.pack f) msg partF
+            where
+                msg = T.pack $ concat [
+                    "Uploading... total rows processed: ",
+                    show total,
+                    ", rows uploaded: ",
+                    show valid]
+        
     liftIO $ forkIO $ do
-        loadFile f' fError program $ partContentType info
-
-        modifyMVar' s $ updateAlert a { alertType = "success"
-                                     , alertMessage = "закончено"
-                                     }
-
-        `E.catches` [ E.Handler (\ (ex :: VinUploadException) ->
-                                     modifyMVar' s $ updateAlert a { alertType = "error"
-                                                                   , alertMessage = vReason ex
-                                                                   , alertErrorFile = vFilePath ex }
-                                )
-                    , E.Handler (\ (ex :: E.SomeException) ->
-                                     modifyMVar' s $ updateAlert a { alertType = "error"
-                                                                   , alertMessage = T.pack $ show ex }
-                                )
-                    ]
-
-        `finally` removeLink f'
-
+        loadFile f' fError fLog program (partContentType info) uploadStats
+        `E.catches` [
+            E.Handler (\(ex :: VinUploadException) -> return ()),
+            E.Handler (\(ex :: E.SomeException) -> return ())]
+        `finally` (do
+            removeLink f'
+            (total, valid) <- readMVar statsVar
+            let
+                resultMessage = T.pack $ concat [
+                    "Done. Total rows processed: ",
+                    show total,
+                    ", rows uploaded: ",
+                    show valid]
+                doneAlert = alertUpdate s $ (successAlert (B.pack f) resultMessage partF
+                    `withErrorFile` fErrorLink
+                    `withErrorLogFile` fLogLink)
+            doneAlert)
+    
     writeBS "Ok"
-  where
-    fError = "resources/static/error.csv"
-    f' = f ++ "-link"
-
+    where
+        fError = "resources/static/error.csv"
+        fLog = "resources/static/errors.log"
+        fErrorLink = "s/error.csv"
+        fLogLink = "s/errors.log"
+        f' = f ++ "-link"
 
 getState :: Handler b Vin ()
 getState = do
     s <- gets _alerts
-    as <- liftIO $ readMVar s
-    writeLBS $ encode as
-
+    alerts' <- liftIO $ readMVar s
+    writeLBS $ encode alerts'
 
 removeAlert :: Handler b Vin ()
 removeAlert = do
     s <- gets _alerts
-
     res <- getParam "id"
-
-    liftIO $ case res of
-               Nothing -> return ()
-               Just k  -> f s k
-
-  where
-    f s k = modifyMVar_ s $ \as ->
-                  return $ deleteAlert k as
-
+    maybe (return ()) (liftIO . alertDelete s) res
 
 routes :: [(ByteString, Handler b Vin ())]
-routes = [ ("/upload", method POST upload)
-         , ("/state", method GET getState)
-         , ("/state", method POST removeAlert)
-         ]
-
+routes = [
+    ("/upload", method POST upload),
+    ("/state", method GET getState),
+    ("/state", method POST removeAlert)]
 
 vinInit :: SnapletInit b Vin
-vinInit =
-    makeSnaplet "vin" "Some description" Nothing $ do
-        as <- liftIO . newMVar $ Alerts M.empty
-        addRoutes routes
-        return $ Vin as
+vinInit = makeSnaplet "vin" "Some description" Nothing $ do
+    alerts' <- liftIO . newMVar $ Alerts M.empty
+    addRoutes routes
+    return $ Vin alerts'

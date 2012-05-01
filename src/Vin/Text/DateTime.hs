@@ -7,11 +7,11 @@ module Vin.Text.DateTime (
 import Control.Monad.Error
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as C8
 import Data.Time
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import System.Locale
 
+import Vin.Text.String
 import Vin.Field
 
 -- | Date-time with format and locale
@@ -19,8 +19,8 @@ timeFormat :: (ParseTime t, Error e) => TimeLocale -> String -> Field e ByteStri
 timeFormat loc fmt = do
     s <- field
     let
-        cantParse = "Unable to parse time " ++ C8.unpack s ++ " with format " ++ fmt
-    maybe (throwError $ strMsg cantParse) return $ parseTime loc fmt (C8.unpack s)
+        cantParse = "Unable to parse time " ++ decodeString s ++ " with format " ++ fmt
+    maybe (throwError $ strMsg cantParse) return $ parseTime loc fmt (decodeString s)
 
 -- | Date-time with format converted back to ByteString
 timeWith
@@ -36,7 +36,7 @@ timeWith loc fmt back = timeFormat loc fmt >>= either' where
 posixLocale :: Error e => TimeLocale -> String -> Field e ByteString ByteString
 posixLocale loc fmt = timeWith loc fmt toBS where
     toBS :: UTCTime -> Either String ByteString
-    toBS = Right . C8.pack . show' . floor . utcTimeToPOSIXSeconds where
+    toBS = Right . encodeString . show' . floor . utcTimeToPOSIXSeconds where
         show' :: Integer -> String
         show' = show
 

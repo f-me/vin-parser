@@ -3,6 +3,8 @@ module Vin.Load (
     Loader, loaders
     ) where
 
+import qualified Codec.Text.IConv as IConv
+
 import Data.Conduit
 import Data.Conduit.Binary
 import qualified Data.Conduit.List as CL
@@ -21,7 +23,7 @@ csv
     => FilePath
     -> Source m DataRow
 csv f = sourceFile f $= intoCSV csvSettings $= CL.map decodeCP1251 where
-    csvSettings = defCSVSettings { csvOutputColSep = ';' }
+    csvSettings = defCSVSettings { csvSep = ';', csvOutputColSep = ';' }
 
 -- | Load XLSX
 xlsx

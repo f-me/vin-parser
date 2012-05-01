@@ -8,8 +8,10 @@ module Vin.Model (
 
 import Data.ByteString (ByteString)
 import qualified Data.Map as M
-import Data.String
 import Data.Traversable (sequenceA)
+
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as E
 
 import Vin.Text
 import Vin.Row
@@ -24,7 +26,7 @@ model :: String -> String -> [(String, Text ByteString)] -> Model
 model = Model
 
 (~::) :: String -> TextField ByteString -> Text ByteString
-s ~:: f = column (fromString s) f
+s ~:: f = column (E.encodeUtf8 $ T.pack s) f
 infixr 2 ~::
 
 -- | Try to parse row

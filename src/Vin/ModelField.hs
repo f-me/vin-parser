@@ -3,10 +3,11 @@
 module Vin.ModelField (
     ModelField,
     modelFieldType, modelField,
+    (~::~),
     (~:~),
     program,
     make,
-    arcModelCode, ffdsId, vin, dealerCode, dealerName, validFrom, validUntil,
+    arcModelCode, fddsId, vin, dealerCode, dealerName, validFrom, validUntil,
     plateNumber, carMaker, carModel, sellDate, programRegistrationDate,
     milageTO, companyCode, companyLATName, lastTODate, color, modelYear, companyName,
     contractNo, contractDate, ownerCompany, ownerContact, ownerName,
@@ -23,6 +24,7 @@ import Data.String
 
 import Vin.Model
 import Vin.Text
+import Vin.Text.String
 import Vin.Text.Specific
 
 type ModelField a = a -> (String, Text ByteString)
@@ -39,20 +41,24 @@ modelFieldType name fieldType v = (name, fieldType v)
 modelField :: String -> TextField ByteString -> ModelField String
 modelField name fieldType v = (name, v ~:: fieldType)
 
+-- | modelFieldType
+(~::~) :: String -> (a -> Text ByteString) -> ModelField a
+(~::~) = modelFieldType
+
 -- | modelField
 (~:~) :: String -> TextField ByteString -> ModelField String
 (~:~) = modelField
 
 -- | Program name
 program :: ModelField String
-program = modelFieldType "program" (pure . fromString)
+program = "program" ~::~ (pure . encodeString)
 
 -- | Make
 make :: ModelField String
-make = modelFieldType "make" (pure . fromString)
+make = "make" ~::~ (pure . encodeString)
 
 -- | Arc model code
-arcModelCode, ffdsId, vin, dealerCode, dealerName, validFrom, validUntil,
+arcModelCode, fddsId, vin, dealerCode, dealerName, validFrom, validUntil,
     plateNumber, carMaker, carModel, sellDate, programRegistrationDate,
     milageTO, companyCode, companyLATName, lastTODate, color, modelYear, companyName,
     contractNo, contractDate, ownerCompany, ownerContact, ownerName,
@@ -72,11 +78,11 @@ contractDate             = "contractDate"                   ~:~ time
 contractNo               = "contractNo"                     ~:~ string
 dealerCode               = "dealerCode"                     ~:~ string
 dealerName               = "dealerName"                     ~:~ string
-ffdsId                   = "ffdsId"                         ~:~ string
+fddsId                   = "fddsId"                         ~:~ string
 lastTODate               = "lastTODate"                     ~:~ time
 manager                  = "manager"                        ~:~ string
 milageTO                 = "milageTO"                       ~:~ string
-modelYear                = "modelYear"                      ~:~ time
+modelYear                = "modelYear"                      ~:~ int
 ownerAddress             = "ownerAddress"                   ~:~ string
 ownerCompany             = "ownerCompany"                   ~:~ string
 ownerContact             = "ownerContact"                   ~:~ string
