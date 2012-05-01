@@ -4,23 +4,20 @@ module Vin.Text.Specific (
     carMakers
     ) where
 
-import Control.Monad.Error
-
 import Data.ByteString (ByteString)
 import qualified Data.Map as M
 
-import Vin.Field
 import Vin.Text
 
 -- | Car colors
-colors :: Error e => Field e ByteString ByteString
+colors :: FieldType String
 colors = oneOf ["red", "green", "blue"]
 
 (<<=~) :: String -> [String] -> M.Map ByteString ByteString
 str <<=~ alts = str <<~ (str : alts)
 
 -- | Car models
-carModels :: Error e => Field e ByteString ByteString
+carModels :: FieldType ByteString
 carModels = table $ M.unions [
   -- VW truck
   "Caddy"      <<=~ ["Кэдди", "кедди", "Кедди"],
@@ -64,5 +61,5 @@ carModels = table $ M.unions [
   "TRANSIT"    <<=~ ["Transit"]]
 
 -- | Car makers
-carMakers :: Error e => Field e ByteString ByteString
-carMakers = string
+carMakers :: FieldType ByteString
+carMakers = byteString

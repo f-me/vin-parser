@@ -1,9 +1,10 @@
 -- | Module for textual fields
 module Vin.Text (
+    FieldType(..),
     TextField, Text,
     TypeError(..),
     decodeString, encodeString, withString,
-    string, upperString, int,
+    byteString, string, upperString, int,
     table, (<<~), oneOf,
     alt, optional, withDefault,
     time, phone, email,
@@ -15,12 +16,14 @@ import Control.Applicative
 import Control.Monad.Error
 
 import Data.ByteString (ByteString)
-import qualified  Data.ByteString.Char8 as C8
+import qualified Data.ByteString.Char8 as C8
 
 import Data.Char (toUpper, isSpace)
 
-import Data.List (intercalate, reverse, dropWhile)
+import Data.List (intercalate)
 import qualified Data.Map as M
+
+import Data.Time.Clock.POSIX
 
 import Text.Email.Validate (isValid)
 
@@ -29,6 +32,10 @@ import Vin.Text.DateTime
 import Vin.Row
 import Vin.Field hiding (alt)
 import qualified Vin.Field as F (alt)
+
+data FieldType a = FieldType {
+    showField :: a -> ByteString,
+    fieldReader :: TextField a }
 
 type TextField a = Field TypeError ByteString a
 
@@ -41,36 +48,41 @@ instance Error TypeError where
     noMsg = InvalidType ""
     strMsg = InvalidType
 
+-- | Trimmed ByteString
+byteString :: FieldType ByteString
+byteString = FieldType id (trim <$> field) where
+    trim = snd . C8.span isSpace . fst . C8.spanEnd isSpace
+
 -- | String field, trimmed
-string :: Error e => Field e ByteString ByteString
-string = withString (p . p) <$> field where
+string :: FieldType String
+string = FieldType encodeString ((p . p . decodeString) <$> field) where
     p = reverse . dropWhile isSpace
 
 -- | Uppercased string
-upperString :: Error e => Field e ByteString ByteString
-upperString = withString (map toUpper) <$> string
+upperString :: FieldType String
+upperString = FieldType encodeString $ (map toUpper <$> fieldReader string)
 
--- | Field with integer, just verify value
-int :: Error e => Field e ByteString ByteString
-int = do
-    s <- string
+-- | Integer field
+int :: FieldType Int
+int = FieldType (encodeString . show) $ do
+    s <- fieldReader string
     let
-        validInt = matchInt $ reads $ decodeString s
-        matchInt :: [(Int, String)] -> Bool
-        matchInt [(_, tl)] = all isSpace tl
-        matchInt _ = False
-    when (not validInt) $
-        throwError $ strMsg $ "Unable to convert field " ++ decodeString s ++ " to int"
-    return s
+        result = case reads s of
+            [(v, tl)] -> if all isSpace tl
+                then Just v
+                else Nothing
+            _ -> Nothing
+        onError = throwError $ strMsg $ "Unable to convert field " ++ s ++ " to int"
+    maybe onError return result
 
 -- | Value from table
-table :: Error e => M.Map ByteString ByteString -> Field e ByteString ByteString
-table t = do
-    s <- string
-    case M.lookup s t of
-        Nothing -> throwError $ strMsg $ "Can't find any matches in table for " ++ decodeString s
+table :: M.Map ByteString ByteString -> FieldType ByteString
+table t = FieldType id $ do
+    s <- fieldReader string
+    case M.lookup (encodeString s) t of
+        Nothing -> throwError $ strMsg $ "Can't find value " ++ s ++ " in table"
         Just v -> return v
-    
+
 -- | Table matching
 (<<~) :: String -> [String] -> M.Map ByteString ByteString
 result <<~ synonims = M.fromList $ zip rs s where
@@ -78,38 +90,44 @@ result <<~ synonims = M.fromList $ zip rs s where
     rs = map encodeString $ repeat result
 
 -- | Value is one of
-oneOf :: Error e => [String] -> Field e ByteString ByteString
-oneOf lst = do
-    s <- string
-    when (not (decodeString s `elem` lst)) $
-        throwError $ strMsg $
-            "Expecting value one of [" ++ intercalate ", " lst ++ "], but got " ++ decodeString s
+oneOf :: [String] -> FieldType String
+oneOf lst = FieldType encodeString $ do
+    s <- fieldReader string
+    when (s `notElem` lst) $ throwError $ strMsg $
+        "Expecting value one of [" ++ intercalate ", " lst ++ "], but got " ++ s
     return s
 
 -- | Alternatives
-alt :: Error e => String -> [Field e ByteString ByteString] -> Field e ByteString ByteString
+alt :: Error e => String -> [Field e ByteString a] -> Field e ByteString a
 alt msg = F.alt (strMsg msg)
 
 -- | Time
-time :: Error e => Field e ByteString ByteString
-time = alt "Can't parse time" $ map posix [
-    "%m/%d/%Y",
-    "%m/%e/%Y",
-    "%m/%e/%Y %k:%M",
-    "%d.%m.%Y",
-    "%e %b %Y",
-    "%e-%b-%Y",
-    "%d-%b-%y",
-    "%m-%d-%y",
-    "%b %Y"]
+time :: FieldType POSIXTime
+time = FieldType showTime times where
+    showTime = encodeString . show' . floor
+    show' :: Integer -> String
+    show' = show
+    times = do
+        s <- fieldReader string
+        alt ("Can't parse time: " ++ s) $ map posix [
+            "%m/%d/%Y",
+            "%m/%e/%Y",
+            "%m/%e/%Y %k:%M",
+            "%d.%m.%Y",
+            "%e %b %Y",
+            "%e-%b-%Y",
+            "%d-%b-%y",
+            "%m-%d-%y",
+            "%b %Y"]
 
 -- | Phone number
-phone :: Error e => Field e ByteString ByteString
+phone :: FieldType String
 phone = string
 
 -- | e-mail
-email :: Error e => Field e ByteString ByteString
-email = do
-    s <- string
-    when (not (isValid $ decodeString s)) $ throwError $ strMsg $ "Invalid e-mail format: " ++ decodeString s
+email :: FieldType String
+email = FieldType encodeString $ do
+    s <- fieldReader string
+    when (not $ isValid s) $
+        throwError $ strMsg $ "Invalid e-mail format: " ++ s
     return s

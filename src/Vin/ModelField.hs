@@ -2,9 +2,10 @@
 -- for model definition
 module Vin.ModelField (
     ModelField,
-    modelFieldType, modelField,
-    (~::~),
-    (~:~),
+    (~::),
+    (<::),
+    (<:),
+    typed,
     program,
     make,
     arcModelCode, fddsId, vin, dealerCode, dealerName, validFrom, validUntil,
@@ -22,80 +23,71 @@ import Control.Applicative
 import Data.ByteString (ByteString)
 import Data.String
 
+import Vin.Row
 import Vin.Model
 import Vin.Text
 import Vin.Text.String
 import Vin.Text.Specific
 
-type ModelField a = a -> (String, Text ByteString)
+-- | Model field
+data ModelField a = ModelField {
+    modelFieldType :: FieldType a,
+    connectToRow :: Text a -> (String, Text ByteString) }
 
--- | Create specific model field
--- For example:
--- > name = modelField "name" string
--- then use it:
--- > name "SomeName"
-modelFieldType :: String -> (a -> Text ByteString) -> ModelField a
-modelFieldType name fieldType v = (name, fieldType v)
+-- | Field by name
+(~::) :: String -> FieldType a -> ModelField a
+name ~:: tp = ModelField tp $ \act -> (name, showField tp <$> act)
 
--- | Create simple field by name and type
-modelField :: String -> TextField ByteString -> ModelField String
-modelField name fieldType v = (name, v ~:: fieldType)
+-- | Connect field with columns
+(<::) :: ModelField a -> Text a -> (String, Text ByteString)
+f <:: act = connectToRow f act
 
--- | modelFieldType
-(~::~) :: String -> (a -> Text ByteString) -> ModelField a
-(~::~) = modelFieldType
+-- | Connect field with one column
+(<:) :: ModelField a -> String -> (String, Text ByteString)
+f <: name = f <:: (name `typed` (modelFieldType f))
 
--- | modelField
-(~:~) :: String -> TextField ByteString -> ModelField String
-(~:~) = modelField
+-- | Make column action from column name and type
+typed :: String -> FieldType a -> Text a
+typed col tp = column (encodeString col) (fieldReader tp)
 
 -- | Program name
-program :: ModelField String
-program = "program" ~::~ (pure . encodeString)
+program :: String -> (String, Text ByteString)
+program p = ("program" ~:: string) <:: pure p
 
 -- | Make
-make :: ModelField String
-make = "make" ~::~ (pure . encodeString)
+make :: String -> (String, Text ByteString)
+make m = ("make" ~:: string) <:: pure m
 
--- | Arc model code
-arcModelCode, fddsId, vin, dealerCode, dealerName, validFrom, validUntil,
-    plateNumber, carMaker, carModel, sellDate, programRegistrationDate,
-    milageTO, companyCode, companyLATName, lastTODate, color, modelYear, companyName,
-    contractNo, contractDate, ownerCompany, ownerContact, ownerName,
-    cardNumber, ownerAddress, ownerPhone, previousVin, manager,
-    serviceInterval, subProgramName, ownerLATName, ownerEmail
-     :: ModelField String
-
-arcModelCode             = "arcModelCode"                   ~:~ string
-carMaker                 = "carMaker"                       ~:~ carMakers
-carModel                 = "carModel"                       ~:~ carModels
-cardNumber               = "cardNumber"                     ~:~ string
-color                    = "color"                          ~:~ colors
-companyCode              = "companyCode"                    ~:~ string
-companyLATName           = "companyLATName"                 ~:~ string
-companyName              = "companyName"                    ~:~ string
-contractDate             = "contractDate"                   ~:~ time
-contractNo               = "contractNo"                     ~:~ string
-dealerCode               = "dealerCode"                     ~:~ string
-dealerName               = "dealerName"                     ~:~ string
-fddsId                   = "fddsId"                         ~:~ string
-lastTODate               = "lastTODate"                     ~:~ time
-manager                  = "manager"                        ~:~ string
-milageTO                 = "milageTO"                       ~:~ string
-modelYear                = "modelYear"                      ~:~ int
-ownerAddress             = "ownerAddress"                   ~:~ string
-ownerCompany             = "ownerCompany"                   ~:~ string
-ownerContact             = "ownerContact"                   ~:~ string
-ownerEmail               = "ownerEmail"                     ~:~ email
-ownerLATName             = "ownerLATName"                   ~:~ string
-ownerName                = "ownerName"                      ~:~ string
-ownerPhone               = "ownerPhone"                     ~:~ phone
-plateNumber              = "plateNumber"                    ~:~ string
-previousVin              = "vin2"                           ~:~ upperString
-programRegistrationDate  = "programRegistrationDate"        ~:~ time
-sellDate                 = "sellDate"                       ~:~ time
-serviceInterval          = "serviceInterval"                ~:~ int
-subProgramName           = "subProgramName"                 ~:~ string
-validFrom                = "validFrom"                      ~:~ time
-validUntil               = "validUntil"                     ~:~ time
-vin                      = "vin"                            ~:~ upperString
+arcModelCode             = "arcModelCode"                   ~:: string
+carMaker                 = "carMaker"                       ~:: carMakers
+carModel                 = "carModel"                       ~:: carModels
+cardNumber               = "cardNumber"                     ~:: string
+color                    = "color"                          ~:: colors
+companyCode              = "companyCode"                    ~:: string
+companyLATName           = "companyLATName"                 ~:: string
+companyName              = "companyName"                    ~:: string
+contractDate             = "contractDate"                   ~:: time
+contractNo               = "contractNo"                     ~:: string
+dealerCode               = "dealerCode"                     ~:: string
+dealerName               = "dealerName"                     ~:: string
+fddsId                   = "fddsId"                         ~:: string
+lastTODate               = "lastTODate"                     ~:: time
+manager                  = "manager"                        ~:: string
+milageTO                 = "milageTO"                       ~:: string
+modelYear                = "modelYear"                      ~:: int
+ownerAddress             = "ownerAddress"                   ~:: string
+ownerCompany             = "ownerCompany"                   ~:: string
+ownerContact             = "ownerContact"                   ~:: string
+ownerEmail               = "ownerEmail"                     ~:: email
+ownerLATName             = "ownerLATName"                   ~:: string
+ownerName                = "ownerName"                      ~:: string
+ownerPhone               = "ownerPhone"                     ~:: phone
+plateNumber              = "plateNumber"                    ~:: string
+previousVin              = "vin2"                           ~:: upperString
+programRegistrationDate  = "programRegistrationDate"        ~:: time
+sellDate                 = "sellDate"                       ~:: time
+serviceInterval          = "serviceInterval"                ~:: int
+subProgramName           = "subProgramName"                 ~:: string
+validFrom                = "validFrom"                      ~:: time
+validUntil               = "validUntil"                     ~:: time
+vin                      = "vin"                            ~:: upperString

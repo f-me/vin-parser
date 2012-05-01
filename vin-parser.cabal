@@ -50,6 +50,7 @@ Library
     ,old-locale
     ,snap                        == 0.8.*
     ,snap-core                   == 0.8.*
+    ,peggy                       == 0.3.*
     ,text
     ,time
     ,transformers                >= 0.2 && < 0.4

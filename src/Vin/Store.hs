@@ -26,8 +26,6 @@ import Data.Typeable
 
 import Database.Redis as R
 
-import Data.String
-
 import qualified System.IO as IO
 
 import Vin.Text (TypeError(..))
