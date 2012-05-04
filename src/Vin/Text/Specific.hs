@@ -10,7 +10,7 @@ import qualified Data.Map as M
 import Vin.Text
 
 -- | Car colors
-colors :: FieldType String
+colors :: FieldType ByteString
 colors = oneOf ["red", "green", "blue"]
 
 (<<=~) :: String -> [String] -> M.Map ByteString ByteString

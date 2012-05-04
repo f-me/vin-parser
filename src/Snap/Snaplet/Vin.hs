@@ -31,6 +31,7 @@ import qualified Data.Text as T
 import           Snap.Core
 import           Snap.Snaplet
 import           Snap.Util.FileUploads
+import           System.FilePath
 import           System.Posix.Files (createLink, removeLink)
 
 import           Vin.Import
@@ -164,10 +165,10 @@ action program info f = do
     
     writeBS "Ok"
     where
-        fError = "resources/static/error.csv"
-        fLog = "resources/static/errors.log"
-        fErrorLink = "s/error.csv"
-        fLogLink = "s/errors.log"
+        fError = "resources/static/" ++ takeBaseName f ++ ".error.csv"
+        fLog = "resources/static/" ++ takeBaseName f ++ ".error.log"
+        fErrorLink = "s/" ++ takeBaseName f ++ ".error.csv"
+        fLogLink = "s/" ++ takeBaseName f ++ ".error.log"
         f' = f ++ "-link"
 
 getState :: Handler b Vin ()

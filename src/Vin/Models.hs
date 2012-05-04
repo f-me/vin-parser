@@ -9,6 +9,8 @@ import Control.Applicative
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import Data.Char
+import Data.Maybe (fromMaybe)
+import qualified Data.Map as M
 import Data.Traversable
 
 import Vin.Model
@@ -22,11 +24,12 @@ capitalized name = (capitalize . C8.uncons) <$> (name `typed` byteString) where
 	capitalize Nothing = C8.empty
 	capitalize (Just (h, t)) = C8.cons (toUpper h) t
 
-model' :: String -> String -> [(String, Text ByteString)] -> Model
-model' p m fs = model p m ([program p, make m] ++ fs)
+model' :: String -> [(String, Text ByteString)] -> Model
+model' p fs = model p ([program p] ++ fs)
 
 ford :: Model
-ford = model' "ford" "FORD" [
+ford = model' "ford" [
+	carMaker <:: pure "Ford",
 	-- fddsId <: "FDDS_ID",
     companyCode <: "DEALER_CODE",
     companyLATName <: "DEALER_NAME",
@@ -35,7 +38,7 @@ ford = model' "ford" "FORD" [
     vin <: "VIN_NUMBER",
     plateNumber <: "LICENCE_PLATE_NO",
     --carMake               "carMake",
-    carModel <: "MODEL",
+	fordModel <: "MODEL",
     -- arcModelCode <: "ARC_MODEL_CODE",
     sellDate <: "FIRST_REGISTRATION_DATE",
     -- fordVehicleType <: "VEHICLE_TYPE",
@@ -44,17 +47,20 @@ ford = model' "ford" "FORD" [
     milageTO <: "MILEAGE"]
 
 fordPlus :: Model
-fordPlus = model' "fordPlus" "FORD" [
+fordPlus = model' "fordPlus" [
     companyCode <: "UR",
     vin <: "VIN",
-	carModel <: "Модель",
+	-- carMaker <: "carMake",
+	fordModel <: "Модель",
 	sellDate <: "Дата первой продажи",
 	lastTODate <: "Дата прохождения ТО",
 	milageTO <: "Пробег на момент прохождения ТО"]
 
 vwMotor :: Model
-vwMotor = model' "vwMotor" "VW" [
-	carModel <: "Модель", -- TODO: Split this column
+vwMotor = model' "vwMotor" [
+	carMaker <:: pure "VW",
+	vwModel <:: ((head . C8.words) <$> ("Модель" `typed` byteString)),
+	-- TODO: Split this column and extract motor & transmission
 	color <: "Цвет авт",
 	modelYear <: "Модельный год",
 	vin <: "VIN",
@@ -68,7 +74,8 @@ vwMotor = model' "vwMotor" "VW" [
 	ownerName <: "Фактический получатель АМ"]
 
 vwCommercial :: Model
-vwCommercial = model' "vwCommercial" "VW" [
+vwCommercial = model' "vwCommercial" [
+	carMaker <:: pure "VW",
 	sellDate <: "Дата продажи",
 	validUntil <: "Дата окончания карты",
 	companyName <: "Продавец",
@@ -76,15 +83,16 @@ vwCommercial = model' "vwCommercial" "VW" [
 	vin <: "VIN",
 	modelYear <: "модельный год",
 	plateNumber <: "госномер",
-	carModel <:: ((head . C8.words) <$> ("модель" `typed` byteString)),
+	vwModel <:: ((head . C8.words) <$> ("модель" `typed` byteString)),
 	ownerName <:: wordsF ["имя", "фамилия", "отчество"],
 	ownerAddress <:: wordsF ["адрес частного лица или организации", "город", "индекс"],
 	ownerPhone <:: wordsF ["тел1", "тел2"],
 	ownerCompany <: "название организации"]
 
 opel :: Model
-opel = model' "opel" "OPEL" [
-	carModel <: "Model",
+opel = model' "opel" [
+	carMaker <:: (("carMake" `typed` byteString) <|> (pure "Opel")),
+	opelModel <: "Model",
 	vin <: "VIN",
 	carMaker <:: (("Brand" `typed` byteString) <|> pure (encodeString "Opel")),
 	companyCode <: "Retail Dealer",
@@ -92,26 +100,28 @@ opel = model' "opel" "OPEL" [
 	previousVin <: "Previous VIN (SKD)"]
 
 hummer :: Model
-hummer = model' "hummer" "HUMMER" [
+hummer = model' "hummer" [
 	companyCode <: "Retail Dealer",
 	sellDate <: "Retail Date",
-	carMaker <: "Brand",
-	carModel <: "Model",
+	carMaker <:"Brand",
+	hummerModel <:: (dropHummer <$> ("Model" `typed` byteString)),
 	vin <: "VIN RUS",
 	previousVin <: "VIN"]
+	where
+		dropHummer = C8.concat . take 1 . drop 1 . C8.words
 
 chevroletNAO :: Model
-chevroletNAO = model' "chevroletNAO" "CHEVROLET" [
+chevroletNAO = model' "chevroletNAO" [
 	companyCode <: "Retail Dealer",
 	sellDate <: "Retail Date",
 	carMaker <: "Brand",
-	carModel <: "Model",
+	chevroletModel <: "Model",
 	vin <: "VIN RUS",
 	previousVin <: "VIN"]
 
 chevroletKorea :: Model
-chevroletKorea = model' "chevroletKorea" "CHEVROLET" [
-	carModel <:: ((head . C8.words) <$> ("Model" `typed` byteString)),
+chevroletKorea = model' "chevroletKorea" [
+	chevroletModel <:: ((head . C8.words) <$> ("Model" `typed` byteString)),
 	carMaker <:: (("Brand" `typed` carModels) <|> pure (encodeString "")),
 	vin <: "VIN",
 	companyCode <: "Retail Dealer",
@@ -119,19 +129,22 @@ chevroletKorea = model' "chevroletKorea" "CHEVROLET" [
 	sellDate <: "Retail Date"]
 
 cadillac :: Model
-cadillac = model' "cadillac" "CADILLAC" [
+cadillac = model' "cadillac" [
 	companyCode <: "Retail Dealer",
 	sellDate <: "Retail Date",
 	carMaker <: "Brand",
-	carModel <: "Model",
+	cadillacModel <:: (dropCadillac <$> ("Model" `typed` byteString)),
 	vin <: "VIN RUS",
 	previousVin <: "VIN"]
+	where
+		dropCadillac = C8.concat . take 1 . drop 1 . C8.words
 
 vwRuslan :: Model
-vwRuslan = model' "vwRuslan" "VW" [
+vwRuslan = model' "vwRuslan" [
 	cardNumber <: "№",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
-	carModel <:: (("Модель Автомобиля VW" `typed` byteString) <|> pure (encodeString "")),
+	carMaker <:: pure "VW",
+	vwModel <:: (rusVW <$> ("Модель Автомобиля VW" `typed` byteString)),
 	vin <: "VIN номер Автомобиля VW",
 	serviceInterval <: "Межсервисный интервал",
 	lastTODate <: "Дата прохождения ТО (Дата регистрации в программе)",
@@ -139,21 +152,21 @@ vwRuslan = model' "vwRuslan" "VW" [
 	validUntil <: "Программа действует до (Дата)"]
 
 chartis :: Model
-chartis = model' "chartis" "CHARTIS" [
+chartis = model' "chartis" [
 	cardNumber <: "№",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
 	carMaker <:: capitalized "Марка Автомобиля",
-	carModel <:: capitalized "Модель Автомобиля",
+	chartisModel <:: capitalized "Модель Автомобиля",
 	vin <: "VIN номер Автомобиля",
 	validFrom <: "Дата регистрации в программе",
 	validUntil <: "Программа действует до (Дата)"]
 
 vwAvilon :: Model
-vwAvilon = model' "vwAvilon" "VW" [
+vwAvilon = model' "vwAvilon" [
 	carMaker <:: pure "VW",
 	cardNumber <: "Подрядковый номер клубной карты",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
-	carModel <: "Модель Автомобиля VW",
+	vwModel <: "Модель Автомобиля VW",
 	vin <: "VIN номер Автомобиля VW",
 	serviceInterval <: "Межсервисный интервал",
 	validFrom <: "Дата регистрации в программе",
@@ -161,12 +174,12 @@ vwAvilon = model' "vwAvilon" "VW" [
 	validUntil <: "Программа действует до (Дата)"]
 
 atlantM :: Model
-atlantM = model' "atlant" "ATLANT" [
+atlantM = model' "atlant" [
 	carMaker <:: pure "VW",
 	cardNumber <: "Номер карты Atlant-M Assistance",
 	subProgramName <: "Тип программы",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
-	carModel <: "Модель Автомобиля VW",
+	vwModel <: "Модель Автомобиля VW",
 	vin <: "VIN номер Автомобиля VW",
 	serviceInterval <: "Межсервисный интервал, км",
 	validFrom <: "Дата регистрации в программе",
@@ -174,19 +187,19 @@ atlantM = model' "atlant" "ATLANT" [
 	validUntil <: "Программа действует до (Дата)"]
 
 autocraft :: Model
-autocraft = model' "autocraft" "AUTOCRAFT" [
+autocraft = model' "autocraft" [
 	carMaker <:: pure "BMW",
 	cardNumber <: "Подрядковый номер клубной карты",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
 	ownerName <: "ФИО Клиента",
-	carModel <: "Модель Автомобиля BMW",
+	bmwModel <: "Модель Автомобиля BMW",
 	vin <: "VIN номер Автомобиля BMW (последние 7 знаков)",
 	validFrom <: "Дата регистрации в программе",
 	validUntil <: "Программа действует до (Даты)",
 	milageTO <: "Величина пробега на момент регистрации в Программе"]
 
 b2c :: Model
-b2c = model' "b2c" "B2C" [
+b2c = model' "b2c" [
 	validFrom <: "Дата активации карты",
 	validUntil <: "Дата окончания срока дейсвия карты",
 	manager <: "ФИО сотрудника торговой точки",
@@ -203,7 +216,7 @@ b2c = model' "b2c" "B2C" [
 	ownerPhone <:: wordsF ["Телефон клиента Мобильный", "Телефон клиента Домашний"],
 	ownerEmail <: "Е-МAIL клиента",
 	carMaker <:: capitalized "Марка автомобиля",
-	carModel <: "Модель автомобиля",
+	b2cModel <: "Модель автомобиля",
 	modelYear <: "Год выпуска",
 	plateNumber <: "Гос номер",
 	vin <: "Идентификационный номер (VIN)",
@@ -213,3 +226,214 @@ models :: [Model]
 models = [ford, fordPlus, vwMotor, vwCommercial, opel, hummer, chevroletNAO,
 	chevroletKorea, cadillac, vwRuslan, chartis, vwAvilon, atlantM, autocraft,
 	b2c]
+
+chevroletModel :: ModelField ByteString
+opelModel :: ModelField ByteString
+cadillacModel :: ModelField ByteString
+vwModel :: ModelField ByteString
+fordModel :: ModelField ByteString
+bmwModel :: ModelField ByteString
+hummerModel :: ModelField ByteString
+b2cModel :: ModelField ByteString -- FIXME: Is this correct?
+chartisModel :: ModelField ByteString -- FIXME: Is this correct?
+
+-- Try map russian names of VW
+rusVW :: ByteString -> ByteString
+rusVW s = fromMaybe s $ M.lookup s rus where
+	rus = M.unions [
+		"Caddy"      <<~ ["Кэдди", "кедди", "Кедди"],
+		"Crafter"    <<~ ["Крафтер"],
+		"Transporter"<<~ ["T5", "Т5", "Транспортер"],
+		"Tiguan"     <<~ ["Тигуан", "тигуан"],
+		"Polo"       <<~ ["Поло"],
+		"Touareg"    <<~ ["Туарег", "Тouareg"],
+		"Passat"     <<~ ["Пассат", "пассат", "Passft"],
+		"Jetta"      <<~ ["Джетта"],
+		"Golf"       <<~ ["Гольф", "гольф", "Гольф+"],
+		"Touran"     <<~ ["Туран"],
+		"Phaeton"    <<~ ["Фаэтон", "фаэтон"],
+		"Eos"        <<~ ["Эос"],
+		"Scirocco"   <<~ ["Сирокко"],
+		"Caravelle"  <<~ ["Каравелла"],
+		"Multivan"   <<~ ["Мультивен"],
+		"Sharan"     <<~ ["Шаран"]]
+
+chevroletModel = "carModel" ~:: oneOfNoCase [
+	"Alero",
+	"Astra",
+	"Aveo",
+	"Beretta",
+	"Blazer",
+	"Camaro",
+	"Caprice",
+	"Captiva",
+	"Cavalier",
+	"Celta",
+	"Cheyenne",
+	"Cobalt",
+	"Colorado",
+	"Corsa",
+	"Corsa Wind",
+	"Corsica",
+	"Corvette",
+	"Epica",
+	"Evanda",
+	"Express",
+	"HHR",
+	"Ipanema GL",
+	"Jimmy",
+	"Kadett",
+	"Lacetti",
+	"lmpala",
+	"Lumina",
+	"Malibu",
+	"Matiz",
+	"Metro",
+	"Monte Carlo",
+	"Monza",
+	"NIVA",
+	"Omega",
+	"Prism",
+	"S-10",
+	"Sierra",
+	"SS",
+	"Suburban",
+	"Tacuma",
+	"Tahoe",
+	"Tracker Convertible",
+	"Tracker Hardtop",
+	"Trail Blazer",
+	"Trans Sport",
+	"Vectra",
+	"Venture",
+	"Zafira"]
+
+opelModel = "carModel" ~:: oneOfNoCase [
+	"Agila",
+	"Antara",
+	"Astra",
+	"Calibra",
+	"Combo",
+	"Corsa",
+	"Frontera",
+	"Insignia",
+	"Kadett",
+	"Meriva",
+	"Monterey",
+	"Movano",
+	"Omega",
+	"Signum",
+	"Sintra",
+	"Tigra",
+	"Vectra",
+	"Vita",
+	"Vivaro",
+	"Zafira"]
+
+cadillacModel = "carModel" ~:: oneOfNoCase [
+	"Allante",
+	"BLS",
+	"Brougham",
+	"Catera",
+	"CTS",
+	"DE Ville",
+	"DTS",
+	"Eldorado",
+	"Escalade",
+	"Fleetwood",
+	"LSE",
+	"Seville",
+	"SRX",
+	"STS",
+	"XLR"]
+
+vwModel = "carModel" ~:: oneOfNoCase [
+	"Caddy",
+	"Amarok",
+	"Crafter",
+	"T5",
+	"Tiguan",
+	"Polo",
+	"Touareg",
+	"Passat",
+	"Jetta",
+	"Golf",
+	"Touran",
+	"Phaeton",
+	"Eos",
+	"Scirocco"]
+
+fordModel = "carModel" ~:: oneOfNoCase [
+	"427",
+	"Aerostar",
+	"Aspire",
+	"Bronco",
+	"C-Max II",
+	"Contour",
+	"Cougar",
+	"Crown Victoria",
+	"Econoline",
+	"Escape",
+	"Escort",
+	"Escort Cabrio",
+	"Escort Classic",
+	"Escort Estate",
+	"Escort Hatchback",
+	"Escort Turnier",
+	"Escort ZX2",
+	"Excursion",
+	"Expedition",
+	"Explorer",
+	"Faction",
+	"Falcon GT",
+	"Fiesta",
+	"Focus",
+	"Fusion",
+	"Galaxy",
+	"Ford GT",
+	"Ikon",
+	"Ka",
+	"Maverick",
+	"Model U",
+	"Mondeo",
+	"Mustang",
+	"Probe",
+	"Puma",
+	"Ranger",
+	"Scorpio",
+	"Shelby GR",
+	"SportKa",
+	"StreetKa",
+	"Taurus",
+	"Thunderbird",
+	"Toureno Connect",
+	"Transit",
+	"Windstar"]
+
+bmwModel = "carModel" ~:: oneOfNoCase [
+	"1 series",
+	"3 series",
+	"5 series",
+	"6 series",
+	"7 series",
+	"8 series",
+	"M3",
+	"M5",
+	"X1",
+	"X3",
+	"X5",
+	"X6",
+	"xActivity",
+	"Z1",
+	"Z3",
+	"Z4",
+	"Z8"]
+
+hummerModel = "carModel" ~:: oneOfNoCase [
+	"H1",
+	"H2",
+	"H3"]
+
+b2cModel = "carModel" ~:: byteString
+chartisModel = "carModel" ~:: byteString
+

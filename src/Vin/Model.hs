@@ -14,11 +14,10 @@ import Vin.Row
 
 data Model = Model {
     modelProgram :: String,
-    modelMake :: String,
     modelFields :: [(String, Text ByteString)] }
 
 -- | Model definition
-model :: String -> String -> [(String, Text ByteString)] -> Model
+model :: String -> [(String, Text ByteString)] -> Model
 model = Model
 
 -- | Try to parse row

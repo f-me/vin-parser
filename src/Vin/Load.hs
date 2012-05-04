@@ -27,15 +27,19 @@ csv f = sourceFile f $= intoCSV csvSettings $= CL.map decodeCP1251 where
 xlsx
     :: MonadResource m
     => FilePath
-    -> Source m DataRow
-xlsx = undefined
+    -> IO (Source m DataRow)
+xlsx f = do
+    x <- Xlsx.xlsx f
+    return (Xlsx.sheetRows x 0 $= CL.map encode)
 
-type Loader m = FilePath -> Source m DataRow
+-- FIXME: Trick with IO used for xlsx to preload file and then create source from it
+-- I don't know the right way to do this
+type Loader m = FilePath -> IO (Source m DataRow)
 
 -- | Loaders by content type
 loaders :: MonadResource m => M.Map String (Loader m)
 loaders = M.fromList [
-    ("text/csv", csv),
+    ("text/csv", return . csv),
     ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx)]
 
 -- Old functions:

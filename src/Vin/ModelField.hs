@@ -8,6 +8,7 @@ module Vin.ModelField (
     typed,
     program,
     make,
+    notNull,
     arcModelCode, fddsId, vin, dealerCode, dealerName, validFrom, validUntil,
     plateNumber, carMaker, carModel, sellDate, programRegistrationDate,
     milageTO, companyCode, companyLATName, lastTODate, color, modelYear, companyName,
@@ -23,6 +24,7 @@ import Control.Applicative
 import Data.ByteString (ByteString)
 import Data.String
 
+import Vin.Field (verify)
 import Vin.Row
 import Vin.Model
 import Vin.Text
@@ -58,9 +60,16 @@ program p = ("program" ~:: string) <:: pure p
 make :: String -> (String, Text ByteString)
 make m = ("make" ~:: string) <:: pure m
 
+-- | Not null string
+notNull :: FieldType String -> FieldType String
+notNull f = f { fieldReader = v } where
+    v = verify (not . null) (const $ InvalidType "Field can't be empty") $ fieldReader f
+
 arcModelCode             = "arcModelCode"                   ~:: string
-carMaker                 = "carMaker"                       ~:: carMakers
+carMaker                 = "carMake"                        ~:: carMakers
 carModel                 = "carModel"                       ~:: carModels
+carMotor                 = "motor"                          ~:: string
+carTransmission          = "transmission"                   ~:: string
 cardNumber               = "cardNumber"                     ~:: string
 color                    = "color"                          ~:: colors
 companyCode              = "companyCode"                    ~:: string
@@ -90,4 +99,4 @@ serviceInterval          = "serviceInterval"                ~:: int
 subProgramName           = "subProgramName"                 ~:: string
 validFrom                = "validFrom"                      ~:: time
 validUntil               = "validUntil"                     ~:: time
-vin                      = "vin"                            ~:: upperString
+vin                      = "vin"                            ~:: notNull upperString

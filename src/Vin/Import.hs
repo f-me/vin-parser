@@ -48,7 +48,8 @@ importData
 importData ms ls from failed errors program content stats = do
     loader <- try (M.lookup content ls) $ "Unknown loader"
     m <- try (find ((== program) . modelProgram) ms) $ "Unknown program"
-    runResourceT $ (loader from $$ sinkXFile redisSetVin failed errors stats m)
+    l <- loader from
+    runResourceT $ (l $$ sinkXFile redisSetVin failed errors stats m)
 
 loadFile :: FilePath -> FilePath -> FilePath -> ByteString -> ByteString -> (Int -> Int -> IO ()) -> IO ()
 loadFile iFile eFile lFile pName cType stats =

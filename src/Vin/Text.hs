@@ -5,7 +5,7 @@ module Vin.Text (
     TypeError(..),
     decodeString, encodeString, withString,
     byteString, string, upperString, int,
-    table, (<<~), oneOf,
+    table, (<<~), oneOf, oneOfNoCase, oneOfBy,
     alt, optional, withDefault,
     time, phone, email,
 
@@ -18,9 +18,11 @@ import Control.Monad.Error
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 
-import Data.Char (toUpper, isSpace)
+import Data.Char (toUpper, isSpace, toLower)
 
-import Data.List (intercalate)
+import Data.Function
+
+import Data.List (intercalate, find)
 import qualified Data.Map as M
 
 import Data.Time.Clock.POSIX
@@ -90,12 +92,21 @@ result <<~ synonims = M.fromList $ zip rs s where
     rs = map encodeString $ repeat result
 
 -- | Value is one of
-oneOf :: [String] -> FieldType String
-oneOf lst = FieldType encodeString $ do
-    s <- fieldReader string
-    when (s `notElem` lst) $ throwError $ strMsg $
-        "Expecting value one of [" ++ intercalate ", " lst ++ "], but got " ++ s
-    return s
+oneOf :: [String] -> FieldType ByteString
+oneOf = oneOfBy (==)
+
+-- | Value is one of ignoring case
+oneOfNoCase :: [String] -> FieldType ByteString
+oneOfNoCase = oneOfBy ((==) `on` map toLower)
+
+-- | Value is one of with comparer
+oneOfBy :: (String -> String -> Bool) -> [String] -> FieldType ByteString
+oneOfBy isEqual lst = FieldType id $ do
+	s <- fieldReader string
+	case find (isEqual s) lst of
+		Nothing -> throwError $ strMsg
+			$ "Expecting value one of [" ++ intercalate ", " lst ++ "], but got " ++ s
+		Just v -> return $ encodeString v
 
 -- | Alternatives
 alt :: Error e => String -> [Field e ByteString a] -> Field e ByteString a
