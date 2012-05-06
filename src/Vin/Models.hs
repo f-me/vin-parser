@@ -6,13 +6,16 @@ module Vin.Models (
     ) where
 
 import Control.Applicative
+import Control.Monad.Error
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import Data.Char
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
+import Data.List (find, isPrefixOf, isSuffixOf)
 import qualified Data.Map as M
 import Data.Traversable
 
+import Vin.Row (column)
 import Vin.Model
 import Vin.ModelField
 
@@ -56,22 +59,69 @@ fordPlus = model' "fordPlus" [
 	lastTODate <: "Дата прохождения ТО",
 	milageTO <: "Пробег на момент прохождения ТО"]
 
+data MotorModel = MotorModel {
+	motorModelName :: String,
+	motorMotor :: String,
+	motorTransmission :: String }
+		deriving (Eq, Ord, Read, Show)
+
 vwMotor :: Model
 vwMotor = model' "vwMotor" [
 	carMaker <:: pure "VW",
-	vwModel <:: ((head . C8.words) <$> ("Модель" `typed` byteString)),
+	vwModel <:: (encodeString <$> column (encodeString "Модель") vwModelValue),
+	-- vwModel <:: ((head . C8.words) <$> ("Модель" `typed` byteString)),
 	-- TODO: Split this column and extract motor & transmission
-	color <: "Цвет авт",
+	color <:: (column (encodeString "Цвет авт") vwColor),
+	carMotor <:: (column (encodeString "Модель") vwMotorType),
+	carTransmission <:: (column (encodeString "Модель") vwTransmission),
 	modelYear <: "Модельный год",
 	vin <: "VIN",
 	dealerCode <: "Код дилера получателя",
 	companyName <: "Дилер получатель",
-	contractNo <: "№ Дог продажи Клиенту",
+	contractNo <: "No Дог продажи Клиенту",
 	contractDate <: "Дата договора продажи",
 	sellDate <: "Дата передачи АМ Клиенту",
-	ownerCompany <: "Компания получатель",
-	ownerContact <: "Контактное лицо получателя",
-	ownerName <: "Фактический получатель АМ"]
+	ownerCompany <: "Компания покупатель",
+	ownerContact <: "Контактное лицо покупателя",
+	ownerName <: "Фактический получатель ам"]
+	where
+		vwColor :: TextField String
+		vwColor = do
+			c <- fieldReader string
+			let
+				res = p . p $ c where
+					p = reverse . snd . break (== '`')
+			return $ if length res < 2 then "" else (init . tail $ res)
+
+		isColor str
+			| "`" `isPrefixOf` str && "`," `isSuffixOf` str = Just (init . init . tail $ str)
+			| "`" `isPrefixOf` str && "`" `isSuffixOf` str = Just (init . tail $ str)
+			| otherwise = Nothing
+
+		vwModelValue :: TextField String
+		vwModelValue = do
+			c <- fieldReader string
+			let failed = throwError $ strMsg $ "Invalid model value " ++ c
+			maybe failed return . listToMaybe . words $ c
+
+		vwMotorType :: TextField String
+		vwMotorType = do
+			c <- fieldReader string
+			let
+				failed = throwError $ strMsg $ "Can't extract motor " ++ c
+				isMotor s = '.' `elem` s && length s == 3
+			maybe failed return $ find isMotor (words c)
+
+		vwTransmission :: TextField String
+		vwTransmission = do
+			c <- fieldReader string
+			let
+				failed = throwError $ strMsg $ "Can't extract transmission " ++ c
+				fromTransmission s
+					| "авт.-" `isPrefixOf` s = Just "auto"
+					| "ручн.-" `isPrefixOf` s = Just "mech"
+					| otherwise = Nothing
+			maybe failed return $ listToMaybe $ mapMaybe fromTransmission $ words c
 
 vwCommercial :: Model
 vwCommercial = model' "vwCommercial" [

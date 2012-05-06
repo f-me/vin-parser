@@ -10,7 +10,7 @@ module Vin.ModelField (
     make,
     notNull,
     arcModelCode, fddsId, vin, dealerCode, dealerName, validFrom, validUntil,
-    plateNumber, carMaker, carModel, sellDate, programRegistrationDate,
+    plateNumber, carMaker, carModel, carMotor, carTransmission, sellDate, programRegistrationDate,
     milageTO, companyCode, companyLATName, lastTODate, color, modelYear, companyName,
     contractNo, contractDate, ownerCompany, ownerContact, ownerName,
     cardNumber, ownerAddress, ownerPhone, previousVin, manager,
@@ -71,7 +71,7 @@ carModel                 = "carModel"                       ~:: carModels
 carMotor                 = "motor"                          ~:: string
 carTransmission          = "transmission"                   ~:: string
 cardNumber               = "cardNumber"                     ~:: string
-color                    = "color"                          ~:: colors
+color                    = "color"                          ~:: string
 companyCode              = "companyCode"                    ~:: string
 companyLATName           = "companyLATName"                 ~:: string
 companyName              = "companyName"                    ~:: string
