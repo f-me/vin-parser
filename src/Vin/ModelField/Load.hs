@@ -9,6 +9,7 @@ module Vin.ModelField.Load (
 
 import Control.Applicative
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as C8
 import qualified Data.Map as M
 import Data.Traversable
     
@@ -94,16 +95,16 @@ loadModel name defSource mapSource = do
     maps <- parseMappings mapSource
     let
         defMap = M.fromList defs
-        compileMapping :: Mapping -> (String, Text ByteString)
+        compileMapping :: Mapping -> (ByteString, Text ByteString)
         compileMapping (n, fs) = case M.lookup n defMap of
             Nothing -> error "No mapping"
-            Just t -> (n, checkType t readfs)
+            Just t -> (encodeString n, checkType t readfs)
             where
-                readfs = concat <$> sequenceA (map (`typed` string) fs)
+                readfs = C8.concat <$> sequenceA (map (`typed` byteString) fs)
     return $ Model name (program name : map compileMapping maps)
 
-checkType :: String -> Text String -> Text ByteString
+checkType :: String -> Text ByteString -> Text ByteString
 checkType t f = maybe empty ($ f) $ M.lookup t fieldTypes where
-    fieldTypes :: M.Map String (Text String -> Text ByteString)
+    fieldTypes :: M.Map String (Text ByteString -> Text ByteString)
     fieldTypes = M.fromList [
-        ("string", \s -> encodeString <$> s)]
+        ("string", id)]

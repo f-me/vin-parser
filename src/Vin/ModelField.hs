@@ -5,6 +5,7 @@ module Vin.ModelField (
     (~::),
     (<::),
     (<:),
+	(<:=),
     typed,
     program,
     make,
@@ -22,6 +23,7 @@ module Vin.ModelField (
 
 import Control.Applicative
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as C8
 import Data.String
 
 import Vin.Field (verify)
@@ -34,69 +36,73 @@ import Vin.Text.Specific
 -- | Model field
 data ModelField a = ModelField {
     modelFieldType :: FieldType a,
-    connectToRow :: Text a -> (String, Text ByteString) }
+    connectToRow :: Text a -> ModelRow }
 
 -- | Field by name
 (~::) :: String -> FieldType a -> ModelField a
-name ~:: tp = ModelField tp $ \act -> (name, showField tp <$> act)
+name ~:: tp = ModelField tp $ \act -> (encodeString name, showField tp <$> act)
 
 -- | Connect field with columns
-(<::) :: ModelField a -> Text a -> (String, Text ByteString)
+(<::) :: ModelField a -> Text a -> ModelRow
 f <:: act = connectToRow f act
 
 -- | Connect field with one column
-(<:) :: ModelField a -> String -> (String, Text ByteString)
+(<:) :: ModelField a -> String -> ModelRow
 f <: name = f <:: (name `typed` (modelFieldType f))
+
+-- | Constant value
+(<:=) :: ModelField ByteString -> String -> ModelRow
+f <:= value = f <:: pure (encodeString value)
 
 -- | Make column action from column name and type
 typed :: String -> FieldType a -> Text a
 typed col tp = column (encodeString col) (fieldReader tp)
 
 -- | Program name
-program :: String -> (String, Text ByteString)
+program :: String -> ModelRow
 program p = ("program" ~:: string) <:: pure p
 
 -- | Make
-make :: String -> (String, Text ByteString)
+make :: String -> ModelRow
 make m = ("make" ~:: string) <:: pure m
 
 -- | Not null string
-notNull :: FieldType String -> FieldType String
+notNull :: FieldType ByteString -> FieldType ByteString
 notNull f = f { fieldReader = v } where
-    v = verify (not . null) (const $ InvalidType "Field can't be empty") $ fieldReader f
+	v = verify (not . C8.null) (const $ InvalidType "Field can't be empty") $ fieldReader f
 
-arcModelCode             = "arcModelCode"                   ~:: string
+arcModelCode             = "arcModelCode"                   ~:: byteString
 carMaker                 = "carMake"                        ~:: carMakers
 carModel                 = "carModel"                       ~:: carModels
-carMotor                 = "motor"                          ~:: string
-carTransmission          = "transmission"                   ~:: string
-cardNumber               = "cardNumber"                     ~:: string
-color                    = "color"                          ~:: string
-companyCode              = "companyCode"                    ~:: string
-companyLATName           = "companyLATName"                 ~:: string
-companyName              = "companyName"                    ~:: string
+carMotor                 = "motor"                          ~:: byteString
+carTransmission          = "transmission"                   ~:: byteString
+cardNumber               = "cardNumber"                     ~:: byteString
+color                    = "color"                          ~:: byteString
+companyCode              = "companyCode"                    ~:: byteString
+companyLATName           = "companyLATName"                 ~:: byteString
+companyName              = "companyName"                    ~:: byteString
 contractDate             = "contractDate"                   ~:: time
-contractNo               = "contractNo"                     ~:: string
-dealerCode               = "dealerCode"                     ~:: string
-dealerName               = "dealerName"                     ~:: string
-fddsId                   = "fddsId"                         ~:: string
+contractNo               = "contractNo"                     ~:: byteString
+dealerCode               = "dealerCode"                     ~:: byteString
+dealerName               = "dealerName"                     ~:: byteString
+fddsId                   = "fddsId"                         ~:: byteString
 lastTODate               = "lastTODate"                     ~:: time
-manager                  = "manager"                        ~:: string
-milageTO                 = "milageTO"                       ~:: string
+manager                  = "manager"                        ~:: byteString
+milageTO                 = "milageTO"                       ~:: byteString
 modelYear                = "modelYear"                      ~:: int
-ownerAddress             = "ownerAddress"                   ~:: string
-ownerCompany             = "ownerCompany"                   ~:: string
-ownerContact             = "ownerContact"                   ~:: string
+ownerAddress             = "ownerAddress"                   ~:: byteString
+ownerCompany             = "ownerCompany"                   ~:: byteString
+ownerContact             = "ownerContact"                   ~:: byteString
 ownerEmail               = "ownerEmail"                     ~:: email
-ownerLATName             = "ownerLATName"                   ~:: string
-ownerName                = "ownerName"                      ~:: string
+ownerLATName             = "ownerLATName"                   ~:: byteString
+ownerName                = "ownerName"                      ~:: byteString
 ownerPhone               = "ownerPhone"                     ~:: phone
-plateNumber              = "plateNumber"                    ~:: string
-previousVin              = "vin2"                           ~:: upperString
+plateNumber              = "plateNumber"                    ~:: byteString
+previousVin              = "vin2"                           ~:: upperByteString
 programRegistrationDate  = "programRegistrationDate"        ~:: time
 sellDate                 = "sellDate"                       ~:: time
 serviceInterval          = "serviceInterval"                ~:: int
-subProgramName           = "subProgramName"                 ~:: string
+subProgramName           = "subProgramName"                 ~:: byteString
 validFrom                = "validFrom"                      ~:: time
 validUntil               = "validUntil"                     ~:: time
-vin                      = "vin"                            ~:: notNull upperString
+vin                      = "vin"                            ~:: notNull upperByteString

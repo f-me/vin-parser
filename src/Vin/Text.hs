@@ -4,8 +4,8 @@ module Vin.Text (
     TextField, Text,
     TypeError(..),
     decodeString, encodeString, withString,
-    byteString, string, upperString, int,
-    table, (<<~), oneOf, oneOfNoCase, oneOfBy,
+    byteString, upperByteString, string, upperString, int, intByte,
+    table, (<<~), oneOf, oneOfByte, oneOfNoCase, oneOfNoCaseByte, oneOfBy, oneOfByByte,
     alt, optional, withDefault,
     time, phone, email,
 
@@ -55,6 +55,10 @@ byteString :: FieldType ByteString
 byteString = FieldType id (trim <$> field) where
     trim = snd . C8.span isSpace . fst . C8.spanEnd isSpace
 
+-- | Trimmed uppercased ByteString
+upperByteString :: FieldType ByteString
+upperByteString = FieldType id $ (C8.map toUpper <$> fieldReader byteString)
+    
 -- | String field, trimmed
 string :: FieldType String
 string = FieldType encodeString ((p . p . decodeString) <$> field) where
@@ -63,6 +67,19 @@ string = FieldType encodeString ((p . p . decodeString) <$> field) where
 -- | Uppercased string
 upperString :: FieldType String
 upperString = FieldType encodeString $ (map toUpper <$> fieldReader string)
+
+-- | Integer field (through bytestring)
+intByte :: FieldType Int
+intByte = FieldType (encodeString . show) $ do
+    s <- fieldReader byteString
+    let
+        result = do
+            (v, tl) <- C8.readInt s
+            if C8.all isSpace tl
+                then return v
+                else Nothing
+        onError = throwError $ strMsg $ "Unable to convert field " ++ decodeString s ++ " to int"
+    maybe onError return result
 
 -- | Integer field
 int :: FieldType Int
@@ -85,6 +102,14 @@ table t = FieldType id $ do
         Nothing -> throwError $ strMsg $ "Can't find value " ++ s ++ " in table"
         Just v -> return v
 
+-- | Value from table through ByteString
+tableByte :: M.Map ByteString ByteString -> FieldType ByteString
+tableByte t = FieldType id $ do
+    s <- fieldReader byteString
+    case M.lookup s t of
+        Nothing -> throwError $ strMsg $ "Can't find valuw " ++ decodeString s ++ " in table"
+        Just v -> return v
+
 -- | Table matching
 (<<~) :: String -> [String] -> M.Map ByteString ByteString
 result <<~ synonims = M.fromList $ zip rs s where
@@ -95,18 +120,39 @@ result <<~ synonims = M.fromList $ zip rs s where
 oneOf :: [String] -> FieldType ByteString
 oneOf = oneOfBy (==)
 
+-- | Value is one of
+oneOfByte :: [String] -> FieldType ByteString
+oneOfByte = oneOfByByte (==)
+
 -- | Value is one of ignoring case
 oneOfNoCase :: [String] -> FieldType ByteString
 oneOfNoCase = oneOfBy ((==) `on` map toLower)
 
+-- | Value is one of ignoring case
+oneOfNoCaseByte :: [String] -> FieldType ByteString
+oneOfNoCaseByte = oneOfByByte ((==) `on` C8.map toLower)
+
 -- | Value is one of with comparer
 oneOfBy :: (String -> String -> Bool) -> [String] -> FieldType ByteString
 oneOfBy isEqual lst = FieldType id $ do
-	s <- fieldReader string
-	case find (isEqual s) lst of
-		Nothing -> throwError $ strMsg
-			$ "Expecting value one of [" ++ intercalate ", " lst ++ "], but got " ++ s
-		Just v -> return $ encodeString v
+    s <- fieldReader string
+    case find (isEqual s) lst of
+        Nothing -> throwError $ strMsg
+            $ "Expecting value one of [" ++ intercalate ", " lst ++ "], but got " ++ s
+        Just v -> return $ encodeString v
+
+-- | Value is one of with comparer by ByteString
+oneOfByByte :: (ByteString -> ByteString -> Bool) -> [String] -> FieldType ByteString
+oneOfByByte isEqual lst = FieldType id $ do
+    s <- fieldReader byteString
+    let
+        isEqual' :: ByteString -> String -> Bool
+        isEqual' l r = isEqual l (encodeString r)
+    case find (isEqual' s) lst of
+        Nothing -> throwError $ strMsg
+            $ "Expecting value one of [" ++ intercalate ", " lst
+                ++ "], but got " ++ decodeString s
+        Just v -> return $ encodeString v
 
 -- | Alternatives
 alt :: Error e => String -> [Field e ByteString a] -> Field e ByteString a
@@ -132,13 +178,14 @@ time = FieldType showTime times where
             "%b %Y"]
 
 -- | Phone number
-phone :: FieldType String
-phone = string
+phone :: FieldType ByteString
+phone = byteString
 
 -- | e-mail
-email :: FieldType String
-email = FieldType encodeString $ do
-    s <- fieldReader string
-    when (not $ isValid s) $
-        throwError $ strMsg $ "Invalid e-mail format: " ++ s
-    return s
+email :: FieldType ByteString
+email = FieldType id $ do
+	s <- fieldReader byteString
+	when (not $ isValid $ decodeString s) $ 
+		throwError $ strMsg $ "Invalid e-mail format: " ++ decodeString s
+	return s
+

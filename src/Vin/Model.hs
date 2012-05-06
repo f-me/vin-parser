@@ -1,6 +1,7 @@
 -- | Module with model definition and parse function
 module Vin.Model (
     Model(..),
+	ModelRow,
     model,
     parse
     ) where
@@ -12,12 +13,16 @@ import Data.Traversable (sequenceA)
 import Vin.Text
 import Vin.Row
 
+-- | One row of model
+type ModelRow = (ByteString, Text ByteString)
+
+-- | Model data
 data Model = Model {
     modelProgram :: String,
-    modelFields :: [(String, Text ByteString)] }
+    modelFields :: [ModelRow] }
 
 -- | Model definition
-model :: String -> [(String, Text ByteString)] -> Model
+model :: String -> [ModelRow] -> Model
 model = Model
 
 -- | Try to parse row
@@ -27,3 +32,4 @@ parse
     -> M.Map ByteString ByteString
     -> Either [RowError ByteString TypeError] [ByteString]
 parse m d = row d (sequenceA (map snd (modelFields m)))
+

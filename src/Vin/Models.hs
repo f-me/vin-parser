@@ -11,7 +11,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import Data.Char
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
-import Data.List (find, isPrefixOf, isSuffixOf)
+import Data.List (find)
 import qualified Data.Map as M
 import Data.Traversable
 
@@ -19,20 +19,24 @@ import Vin.Row (column)
 import Vin.Model
 import Vin.ModelField
 
-wordsF :: [String] -> Text String
-wordsF ws = unwords <$> (sequenceA $ map (`typed` string) ws)
+wordsF :: [String] -> Text ByteString
+wordsF ws = C8.unwords <$> (sequenceA $ map (`typed` byteString) ws)
 
 capitalized :: String -> Text ByteString
 capitalized name = (capitalize . C8.uncons) <$> (name `typed` byteString) where
 	capitalize Nothing = C8.empty
 	capitalize (Just (h, t)) = C8.cons (toUpper h) t
 
-model' :: String -> [(String, Text ByteString)] -> Model
+model' :: String -> [ModelRow] -> Model
 model' p fs = model p ([program p] ++ fs)
+
+mhead :: [ByteString] -> ByteString
+mhead [] = C8.empty
+mhead (l:_) = l
 
 ford :: Model
 ford = model' "ford" [
-	carMaker <:: pure "Ford",
+	carMaker <:= "Ford",
 	-- fddsId <: "FDDS_ID",
     companyCode <: "DEALER_CODE",
     companyLATName <: "DEALER_NAME",
@@ -67,12 +71,12 @@ data MotorModel = MotorModel {
 
 vwMotor :: Model
 vwMotor = model' "vwMotor" [
-	carMaker <:: pure "VW",
-	vwModel <:: (encodeString <$> column (encodeString "Модель") vwModelValue),
+	carMaker <:= "VW",
+	vwModel <:: (column (encodeString "Модель") vwModelValue),
 	-- vwModel <:: ((head . C8.words) <$> ("Модель" `typed` byteString)),
 	-- TODO: Split this column and extract motor & transmission
 	color <:: (column (encodeString "Цвет авт") vwColor),
-	carMotor <:: (column (encodeString "Модель") vwMotorType),
+	carMotor <:: (column (encodeString "Модель") vwMotorType <|> pure ""),
 	carTransmission <:: (column (encodeString "Модель") vwTransmission),
 	modelYear <: "Модельный год",
 	vin <: "VIN",
@@ -85,47 +89,41 @@ vwMotor = model' "vwMotor" [
 	ownerContact <: "Контактное лицо покупателя",
 	ownerName <: "Фактический получатель ам"]
 	where
-		vwColor :: TextField String
+		vwColor :: TextField ByteString
 		vwColor = do
-			c <- fieldReader string
+			c <- fieldReader byteString
 			let
-				res = p . p $ c where
-					p = reverse . snd . break (== '`')
-			return $ if length res < 2 then "" else (init . tail $ res)
+				res = fst . C8.breakEnd (== '`') . snd . C8.break (== '`') $ c
+			return $ if C8.length res < 2 then C8.empty else (C8.init . C8.tail $ res)
 
-		isColor str
-			| "`" `isPrefixOf` str && "`," `isSuffixOf` str = Just (init . init . tail $ str)
-			| "`" `isPrefixOf` str && "`" `isSuffixOf` str = Just (init . tail $ str)
-			| otherwise = Nothing
-
-		vwModelValue :: TextField String
+		vwModelValue :: TextField ByteString
 		vwModelValue = do
-			c <- fieldReader string
-			let failed = throwError $ strMsg $ "Invalid model value " ++ c
-			maybe failed return . listToMaybe . words $ c
+			c <- fieldReader byteString
+			let failed = throwError $ strMsg $ "Invalid model value " ++ decodeString c
+			maybe failed return . listToMaybe . C8.words $ c
 
-		vwMotorType :: TextField String
+		vwMotorType :: TextField ByteString
 		vwMotorType = do
-			c <- fieldReader string
+			c <- fieldReader byteString
 			let
-				failed = throwError $ strMsg $ "Can't extract motor " ++ c
-				isMotor s = '.' `elem` s && length s == 3
-			maybe failed return $ find isMotor (words c)
+				failed = throwError $ strMsg $ "Can't extract motor " ++ decodeString c
+				isMotor s = '.' `C8.elem` s && C8.length s == 3
+			maybe failed return $ find isMotor (C8.words c)
 
-		vwTransmission :: TextField String
+		vwTransmission :: TextField ByteString
 		vwTransmission = do
-			c <- fieldReader string
+			c <- fieldReader byteString
 			let
-				failed = throwError $ strMsg $ "Can't extract transmission " ++ c
+				failed = throwError $ strMsg $ "Can't extract transmission " ++ decodeString c
 				fromTransmission s
-					| "авт.-" `isPrefixOf` s = Just "auto"
-					| "ручн.-" `isPrefixOf` s = Just "mech"
+					| (encodeString "авт.-") `C8.isPrefixOf` s = Just (encodeString "auto")
+					| (encodeString "ручн.-") `C8.isPrefixOf` s = Just (encodeString "mech")
 					| otherwise = Nothing
-			maybe failed return $ listToMaybe $ mapMaybe fromTransmission $ words c
+			maybe failed return $ listToMaybe $ mapMaybe fromTransmission $ C8.words c
 
 vwCommercial :: Model
 vwCommercial = model' "vwCommercial" [
-	carMaker <:: pure "VW",
+	carMaker <:= "VW",
 	sellDate <: "Дата продажи",
 	validUntil <: "Дата окончания карты",
 	companyName <: "Продавец",
@@ -133,7 +131,7 @@ vwCommercial = model' "vwCommercial" [
 	vin <: "VIN",
 	modelYear <: "модельный год",
 	plateNumber <: "госномер",
-	vwModel <:: ((head . C8.words) <$> ("модель" `typed` byteString)),
+	vwModel <:: ((mhead . C8.words) <$> ("модель" `typed` byteString)),
 	ownerName <:: wordsF ["имя", "фамилия", "отчество"],
 	ownerAddress <:: wordsF ["адрес частного лица или организации", "город", "индекс"],
 	ownerPhone <:: wordsF ["тел1", "тел2"],
@@ -141,7 +139,7 @@ vwCommercial = model' "vwCommercial" [
 
 opel :: Model
 opel = model' "opel" [
-	carMaker <:: (("carMake" `typed` byteString) <|> (pure "Opel")),
+	carMaker <:: (("carMake" `typed` byteString) <|> (pure (encodeString "Opel"))),
 	opelModel <: "Model",
 	vin <: "VIN",
 	carMaker <:: (("Brand" `typed` byteString) <|> pure (encodeString "Opel")),
@@ -171,7 +169,7 @@ chevroletNAO = model' "chevroletNAO" [
 
 chevroletKorea :: Model
 chevroletKorea = model' "chevroletKorea" [
-	chevroletModel <:: ((head . C8.words) <$> ("Model" `typed` byteString)),
+	chevroletModel <:: ((mhead . C8.words) <$> ("Model" `typed` byteString)),
 	carMaker <:: (("Brand" `typed` carModels) <|> pure (encodeString "")),
 	vin <: "VIN",
 	companyCode <: "Retail Dealer",
@@ -193,7 +191,7 @@ vwRuslan :: Model
 vwRuslan = model' "vwRuslan" [
 	cardNumber <: "№",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
-	carMaker <:: pure "VW",
+	carMaker <:= "VW",
 	vwModel <:: (rusVW <$> ("Модель Автомобиля VW" `typed` byteString)),
 	vin <: "VIN номер Автомобиля VW",
 	serviceInterval <: "Межсервисный интервал",
@@ -213,7 +211,7 @@ chartis = model' "chartis" [
 
 vwAvilon :: Model
 vwAvilon = model' "vwAvilon" [
-	carMaker <:: pure "VW",
+	carMaker <:= "VW",
 	cardNumber <: "Подрядковый номер клубной карты",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
 	vwModel <: "Модель Автомобиля VW",
@@ -225,7 +223,7 @@ vwAvilon = model' "vwAvilon" [
 
 atlantM :: Model
 atlantM = model' "atlant" [
-	carMaker <:: pure "VW",
+	carMaker <:= "VW",
 	cardNumber <: "Номер карты Atlant-M Assistance",
 	subProgramName <: "Тип программы",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
@@ -238,7 +236,7 @@ atlantM = model' "atlant" [
 
 autocraft :: Model
 autocraft = model' "autocraft" [
-	carMaker <:: pure "BMW",
+	carMaker <:= "BMW",
 	cardNumber <: "Подрядковый номер клубной карты",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
 	ownerName <: "ФИО Клиента",
@@ -308,7 +306,7 @@ rusVW s = fromMaybe s $ M.lookup s rus where
 		"Multivan"   <<~ ["Мультивен"],
 		"Sharan"     <<~ ["Шаран"]]
 
-chevroletModel = "carModel" ~:: oneOfNoCase [
+chevroletModel = "carModel" ~:: oneOfNoCaseByte [
 	"Alero",
 	"Astra",
 	"Aveo",
@@ -358,7 +356,7 @@ chevroletModel = "carModel" ~:: oneOfNoCase [
 	"Venture",
 	"Zafira"]
 
-opelModel = "carModel" ~:: oneOfNoCase [
+opelModel = "carModel" ~:: oneOfNoCaseByte [
 	"Agila",
 	"Antara",
 	"Astra",
@@ -380,7 +378,7 @@ opelModel = "carModel" ~:: oneOfNoCase [
 	"Vivaro",
 	"Zafira"]
 
-cadillacModel = "carModel" ~:: oneOfNoCase [
+cadillacModel = "carModel" ~:: oneOfNoCaseByte [
 	"Allante",
 	"BLS",
 	"Brougham",
@@ -397,7 +395,7 @@ cadillacModel = "carModel" ~:: oneOfNoCase [
 	"STS",
 	"XLR"]
 
-vwModel = "carModel" ~:: oneOfNoCase [
+vwModel = "carModel" ~:: oneOfNoCaseByte [
 	"Caddy",
 	"Amarok",
 	"Crafter",
@@ -413,7 +411,7 @@ vwModel = "carModel" ~:: oneOfNoCase [
 	"Eos",
 	"Scirocco"]
 
-fordModel = "carModel" ~:: oneOfNoCase [
+fordModel = "carModel" ~:: oneOfNoCaseByte [
 	"427",
 	"Aerostar",
 	"Aspire",
@@ -460,7 +458,7 @@ fordModel = "carModel" ~:: oneOfNoCase [
 	"Transit",
 	"Windstar"]
 
-bmwModel = "carModel" ~:: oneOfNoCase [
+bmwModel = "carModel" ~:: oneOfNoCaseByte [
 	"1 series",
 	"3 series",
 	"5 series",
@@ -479,7 +477,7 @@ bmwModel = "carModel" ~:: oneOfNoCase [
 	"Z4",
 	"Z8"]
 
-hummerModel = "carModel" ~:: oneOfNoCase [
+hummerModel = "carModel" ~:: oneOfNoCaseByte [
 	"H1",
 	"H2",
 	"H3"]

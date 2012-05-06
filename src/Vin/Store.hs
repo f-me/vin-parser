@@ -61,7 +61,7 @@ type ParseError = (DataRow, [RowError ByteString TypeError])
 parseRow :: Model -> DataRow -> Either ParseError DataRow
 parseRow m r = case parse m r of
     Left e -> Left (r, e)
-    Right s -> Right $ M.fromList $ zip (map (encodeString . fst) (modelFields m)) s
+    Right s -> Right $ M.fromList $ zip (map fst (modelFields m)) s
 
 sinkXFile
     :: MonadResource m
