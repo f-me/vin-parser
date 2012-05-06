@@ -166,7 +166,7 @@ time = FieldType showTime times where
     show' = show
     times = do
         s <- fieldReader string
-        alt ("Can't parse time: " ++ s) $ map posix [
+        alt ("Can't parse time: " ++ s) $ dublin : map posix [
             "%m/%d/%Y",
             "%m/%e/%Y",
             "%m/%e/%Y %k:%M",
