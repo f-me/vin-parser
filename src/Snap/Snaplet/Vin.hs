@@ -28,6 +28,7 @@ import           Data.Aeson
 import           Data.Lens.Template
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import           Snap.Core
 import           Snap.Snaplet
 import           Snap.Util.FileUploads
@@ -126,7 +127,6 @@ action :: ByteString -> PartInfo -> String -> Handler b Vin ()
 action program info f = do
     liftIO $ createLink f f'
     s <- gets _alerts
-    let partF = fromMaybe "" $ partFileName info
     liftIO $ do
         alertInsert s $ infoAlert (B.pack f) "Uploading..." partF
     
@@ -165,10 +165,16 @@ action program info f = do
     
     writeBS "Ok"
     where
-        fError = "resources/static/" ++ takeBaseName f ++ ".error.csv"
-        fLog = "resources/static/" ++ takeBaseName f ++ ".error.log"
-        fErrorLink = "s/" ++ takeBaseName f ++ ".error.csv"
-        fLogLink = "s/" ++ takeBaseName f ++ ".error.log"
+        partF = fromMaybe "" $ partFileName info
+        unquote "" = ""
+        unquote s
+            | head s == '"' = init . tail $ s
+            | otherwise = s
+        partFs = unquote $ T.unpack $ T.decodeUtf8 partF
+        fError = "resources/static/" ++ partFs ++ ".error.csv"
+        fLog = "resources/static/" ++ partFs ++ ".error.log"
+        fErrorLink = "s/" ++ partFs ++ ".error.csv"
+        fLogLink = "s/" ++ partFs ++ ".error.log"
         f' = f ++ "-link"
 
 getState :: Handler b Vin ()
