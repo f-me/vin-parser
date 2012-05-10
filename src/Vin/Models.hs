@@ -2,22 +2,51 @@
 
 -- | Module with model definitions
 module Vin.Models (
+	runWithDict, runDict,
     models
     ) where
 
 import Control.Applicative
 import Control.Monad.Error
+import Control.Monad.Reader
+import Data.Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import Data.Char
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
-import Data.List (find)
+import Data.List (find, elem)
 import qualified Data.Map as M
-import Data.Traversable
+import qualified Data.Text as T
+import Data.Traversable hiding (sequence)
 
 import Vin.Row (column)
 import Vin.Model
 import Vin.ModelField
+import Vin.Models.Cars
+
+-- | File with car models
+dictionaries :: FilePath
+dictionaries = "resources/static/js/data/dictionaries.json"
+
+getCars :: Value -> String -> [String]
+getCars v c = maybe [] (map (T.unpack . label)) $ getMember v ["CarModels", "entries", c]
+
+-- | Dictionaried
+type Dict a = Reader Value a
+
+-- | Cars reader
+cars :: String -> Dict (ModelField ByteString)
+cars s = do
+	cars' <- asks (`getCars` s)
+	return ("carModel" ~:: oneOfNoCaseByte cars')
+
+-- | Run with dictionary
+runWithDict :: FilePath -> Dict a -> IO (Maybe a)
+runWithDict f act = fmap (fmap (runReader act)) $ loadValue f
+
+-- | Run default dictionary
+runDict :: Dict a -> IO (Maybe a)
+runDict = runWithDict dictionaries
 
 wordsF :: [String] -> Text ByteString
 wordsF ws = C8.unwords <$> (sequenceA $ map (`typed` byteString) ws)
@@ -28,37 +57,45 @@ capitalized name = (capitalize . C8.uncons) <$> (name `typed` byteString) where
 	capitalize (Just (h, t)) = C8.cons (toUpper h) t
 
 model' :: String -> [ModelRow] -> Model
-model' p fs = model p ([program p] ++ fs)
+model' p fs = model p (program p : fs)
 
 mhead :: [ByteString] -> ByteString
 mhead [] = C8.empty
 mhead (l:_) = l
 
-ford :: Model
-ford = model' "ford" [
+withModel
+	:: Dict (ModelField ByteString)
+	-> (ModelField ByteString -> ModelRow)
+	-> String
+	-> [ModelRow]
+	-> Dict Model
+withModel m onModel p fs = do
+	m' <- m
+	return $ model' p (onModel m' : fs)
+
+ford :: Dict Model
+ford = withModel fordModel (<: "MODEL") "ford" [
 	carMaker <:= "Ford",
 	-- fddsId <: "FDDS_ID",
-    companyCode <: "DEALER_CODE",
-    companyLATName <: "DEALER_NAME",
-    validFrom <: "VALID_FROM",
-    validUntil <: "VALID_TO",
-    vin <: "VIN_NUMBER",
-    plateNumber <: "LICENCE_PLATE_NO",
-    --carMake               "carMake",
-	fordModel <: "MODEL",
-    -- arcModelCode <: "ARC_MODEL_CODE",
-    sellDate <: "FIRST_REGISTRATION_DATE",
-    -- fordVehicleType <: "VEHICLE_TYPE",
-    -- fordCountryFirstSold <: "COUNTRY_FIRST_SOLD",
-    programRegistrationDate <: "CREATION_DATE",
-    milageTO <: "MILEAGE"]
+	companyCode <: "DEALER_CODE",
+	companyLATName <: "DEALER_NAME",
+	validFrom <: "VALID_FROM",
+	validUntil <: "VALID_TO",
+	vin <: "VIN_NUMBER",
+	plateNumber <: "LICENCE_PLATE_NO",
+	--carMake               "carMake",
+	-- arcModelCode <: "ARC_MODEL_CODE",
+	sellDate <: "FIRST_REGISTRATION_DATE",
+	-- fordVehicleType <: "VEHICLE_TYPE",
+	-- fordCountryFirstSold <: "COUNTRY_FIRST_SOLD",
+	programRegistrationDate <: "CREATION_DATE",
+	milageTO <: "MILEAGE"]
 
-fordPlus :: Model
-fordPlus = model' "fordPlus" [
-    companyCode <: "UR",
-    vin <: "VIN",
+fordPlus :: Dict Model
+fordPlus = withModel fordModel (<: "Модель") "fordPlus" [
+	companyCode <: "UR",
+	vin <: "VIN",
 	-- carMaker <: "carMake",
-	fordModel <: "Модель",
 	sellDate <: "Дата первой продажи",
 	lastTODate <: "Дата прохождения ТО",
 	milageTO <: "Пробег на момент прохождения ТО"]
@@ -69,10 +106,9 @@ data MotorModel = MotorModel {
 	motorTransmission :: String }
 		deriving (Eq, Ord, Read, Show)
 
-vwMotor :: Model
-vwMotor = model' "vwMotor" [
+vwMotor :: Dict Model
+vwMotor = withModel vwModel (<:: (column (encodeString "Модель") vwModelValue)) "vwMotor" [
 	carMaker <:= "VW",
-	vwModel <:: (column (encodeString "Модель") vwModelValue),
 	-- vwModel <:: ((head . C8.words) <$> ("Модель" `typed` byteString)),
 	-- TODO: Split this column and extract motor & transmission
 	color <:: (column (encodeString "Цвет авт") vwColor),
@@ -107,7 +143,7 @@ vwMotor = model' "vwMotor" [
 			c <- fieldReader byteString
 			let
 				failed = throwError $ strMsg $ "Can't extract motor " ++ decodeString c
-				isMotor s = '.' `C8.elem` s && C8.length s == 3
+				isMotor s = C8.length s == 3 && (C8.index s 1 `elem` ".,")
 			maybe failed return $ find isMotor (C8.words c)
 
 		vwTransmission :: TextField ByteString
@@ -117,12 +153,14 @@ vwMotor = model' "vwMotor" [
 				failed = throwError $ strMsg $ "Can't extract transmission " ++ decodeString c
 				fromTransmission s
 					| (encodeString "авт.-") `C8.isPrefixOf` s = Just (encodeString "auto")
+					| (encodeString "авт,-") `C8.isPrefixOf` s = Just (encodeString "auto")
 					| (encodeString "ручн.-") `C8.isPrefixOf` s = Just (encodeString "mech")
+					| (encodeString "ручн,-") `C8.isPrefixOf` s = Just (encodeString "mech")
 					| otherwise = Nothing
 			maybe failed return $ listToMaybe $ mapMaybe fromTransmission $ C8.words c
 
-vwCommercial :: Model
-vwCommercial = model' "vwCommercial" [
+vwCommercial :: Dict Model
+vwCommercial = withModel vwModel (<:: ((mhead . C8.words) <$> ("модель" `typed` byteString))) "vwCommercial" [
 	carMaker <:= "VW",
 	sellDate <: "Дата продажи",
 	validUntil <: "Дата окончания карты",
@@ -131,123 +169,117 @@ vwCommercial = model' "vwCommercial" [
 	vin <: "VIN",
 	modelYear <: "модельный год",
 	plateNumber <: "госномер",
-	vwModel <:: ((mhead . C8.words) <$> ("модель" `typed` byteString)),
 	ownerName <:: wordsF ["имя", "фамилия", "отчество"],
 	ownerAddress <:: wordsF ["адрес частного лица или организации", "город", "индекс"],
 	ownerPhone <:: wordsF ["тел1", "тел2"],
 	ownerCompany <: "название организации"]
 
-opel :: Model
-opel = model' "opel" [
+opel :: Dict Model
+opel = withModel opelModel (<: "Model") "opel" [
 	carMaker <:: (("carMake" `typed` byteString) <|> (pure (encodeString "Opel"))),
-	opelModel <: "Model",
 	vin <: "VIN",
 	carMaker <:: (("Brand" `typed` byteString) <|> pure (encodeString "Opel")),
 	companyCode <: "Retail Dealer",
 	sellDate <: "Retail Date",
 	previousVin <: "Previous VIN (SKD)"]
 
-hummer :: Model
-hummer = model' "hummer" [
+hummer :: Dict Model
+hummer = withModel hummerModel (<:: (dropHummer <$> ("Model" `typed` byteString))) "hummer" [
 	companyCode <: "Retail Dealer",
 	sellDate <: "Retail Date",
 	carMaker <:"Brand",
-	hummerModel <:: (dropHummer <$> ("Model" `typed` byteString)),
 	vin <: "VIN RUS",
 	previousVin <: "VIN"]
 	where
 		dropHummer = C8.concat . take 1 . drop 1 . C8.words
 
-chevroletNAO :: Model
-chevroletNAO = model' "chevroletNAO" [
+chevroletNAO :: Dict Model
+chevroletNAO = withModel chevroletModel (<: "Model") "chevroletNAO" [
 	companyCode <: "Retail Dealer",
 	sellDate <: "Retail Date",
 	carMaker <: "Brand",
-	chevroletModel <: "Model",
 	vin <: "VIN RUS",
 	previousVin <: "VIN"]
 
-chevroletKorea :: Model
-chevroletKorea = model' "chevroletKorea" [
-	chevroletModel <:: ((mhead . C8.words) <$> ("Model" `typed` byteString)),
+chevroletKorea :: Dict Model
+chevroletKorea = withModel chevroletModel onModel "chevroletKorea" [
 	carMaker <:: (("Brand" `typed` carModels) <|> pure (encodeString "")),
 	vin <: "VIN",
 	companyCode <: "Retail Dealer",
 	-- previousVin <: "Previous VIN (SKD)",
 	sellDate <: "Retail Date"]
+	where
+		onModel = (<:: ((mhead . C8.words) <$> ("Model" `typed` byteString)))
 
-cadillac :: Model
-cadillac = model' "cadillac" [
+cadillac :: Dict Model
+cadillac = withModel cadillacModel onModel "cadillac" [
 	companyCode <: "Retail Dealer",
 	sellDate <: "Retail Date",
 	carMaker <: "Brand",
-	cadillacModel <:: (dropCadillac <$> ("Model" `typed` byteString)),
 	vin <: "VIN RUS",
 	previousVin <: "VIN"]
 	where
 		dropCadillac = C8.concat . take 1 . drop 1 . C8.words
+		onModel = (<:: (dropCadillac <$> ("Model" `typed` byteString)))
 
-vwRuslan :: Model
-vwRuslan = model' "vwRuslan" [
+vwRuslan :: Dict Model
+vwRuslan = withModel vwModel onModel "vwRuslan" [
 	cardNumber <: "№",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
 	carMaker <:= "VW",
-	vwModel <:: (rusVW <$> ("Модель Автомобиля VW" `typed` byteString)),
 	vin <: "VIN номер Автомобиля VW",
 	serviceInterval <: "Межсервисный интервал",
 	lastTODate <: "Дата прохождения ТО (Дата регистрации в программе)",
 	milageTO <: "Величина пробега на момент регистрации в Программе",
 	validUntil <: "Программа действует до (Дата)"]
+	where
+		onModel = (<:: (rusVW <$> ("Модель Автомобиля VW" `typed` byteString)))
 
-chartis :: Model
-chartis = model' "chartis" [
+chartis :: Dict Model
+chartis = withModel chartisModel (<:: capitalized "Модель Автомобиля") "chartis" [
 	cardNumber <: "№",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
 	carMaker <:: capitalized "Марка Автомобиля",
-	chartisModel <:: capitalized "Модель Автомобиля",
 	vin <: "VIN номер Автомобиля",
 	validFrom <: "Дата регистрации в программе",
 	validUntil <: "Программа действует до (Дата)"]
 
-vwAvilon :: Model
-vwAvilon = model' "vwAvilon" [
+vwAvilon :: Dict Model
+vwAvilon = withModel vwModel (<: "Модель Автомобиля VW") "vwAvilon" [
 	carMaker <:= "VW",
 	cardNumber <: "Подрядковый номер клубной карты",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
-	vwModel <: "Модель Автомобиля VW",
 	vin <: "VIN номер Автомобиля VW",
 	serviceInterval <: "Межсервисный интервал",
 	validFrom <: "Дата регистрации в программе",
 	milageTO <: "Величина пробега на момент регистрации в Программе",
 	validUntil <: "Программа действует до (Дата)"]
 
-atlantM :: Model
-atlantM = model' "atlant" [
+atlantM :: Dict Model
+atlantM = withModel vwModel (<: "Модель Автомобиля VW") "atlant" [
 	carMaker <:= "VW",
 	cardNumber <: "Номер карты Atlant-M Assistance",
 	subProgramName <: "Тип программы",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
-	vwModel <: "Модель Автомобиля VW",
 	vin <: "VIN номер Автомобиля VW",
 	serviceInterval <: "Межсервисный интервал, км",
 	validFrom <: "Дата регистрации в программе",
 	milageTO <: "Величина пробега на момент регистрации в Программе, км",
 	validUntil <: "Программа действует до (Дата)"]
 
-autocraft :: Model
-autocraft = model' "autocraft" [
+autocraft :: Dict Model
+autocraft = withModel bmwModel (<: "Модель Автомобиля BMW") "autocraft" [
 	carMaker <:= "BMW",
 	cardNumber <: "Подрядковый номер клубной карты",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
 	ownerName <: "ФИО Клиента",
-	bmwModel <: "Модель Автомобиля BMW",
 	vin <: "VIN номер Автомобиля BMW (последние 7 знаков)",
 	validFrom <: "Дата регистрации в программе",
 	validUntil <: "Программа действует до (Даты)",
 	milageTO <: "Величина пробега на момент регистрации в Программе"]
 
-b2c :: Model
-b2c = model' "b2c" [
+b2c :: Dict Model
+b2c = withModel b2cModel (<: "Модель автомобиля") "b2c" [
 	validFrom <: "Дата активации карты",
 	validUntil <: "Дата окончания срока дейсвия карты",
 	manager <: "ФИО сотрудника торговой точки",
@@ -264,26 +296,25 @@ b2c = model' "b2c" [
 	ownerPhone <:: wordsF ["Телефон клиента Мобильный", "Телефон клиента Домашний"],
 	ownerEmail <: "Е-МAIL клиента",
 	carMaker <:: capitalized "Марка автомобиля",
-	b2cModel <: "Модель автомобиля",
 	modelYear <: "Год выпуска",
 	plateNumber <: "Гос номер",
 	vin <: "Идентификационный номер (VIN)",
 	ownerContact <:: wordsF ["Фамилия доверенного лица", "Имя доверенного лица", "Отчество доверенного лица"]]
 
-models :: [Model]
-models = [ford, fordPlus, vwMotor, vwCommercial, opel, hummer, chevroletNAO,
+models :: Dict [Model]
+models = sequence [ford, fordPlus, vwMotor, vwCommercial, opel, hummer, chevroletNAO,
 	chevroletKorea, cadillac, vwRuslan, chartis, vwAvilon, atlantM, autocraft,
 	b2c]
 
-chevroletModel :: ModelField ByteString
-opelModel :: ModelField ByteString
-cadillacModel :: ModelField ByteString
-vwModel :: ModelField ByteString
-fordModel :: ModelField ByteString
-bmwModel :: ModelField ByteString
-hummerModel :: ModelField ByteString
-b2cModel :: ModelField ByteString -- FIXME: Is this correct?
-chartisModel :: ModelField ByteString -- FIXME: Is this correct?
+chevroletModel :: Dict (ModelField ByteString)
+opelModel :: Dict (ModelField ByteString)
+cadillacModel :: Dict (ModelField ByteString)
+vwModel :: Dict (ModelField ByteString)
+fordModel :: Dict (ModelField ByteString)
+bmwModel :: Dict (ModelField ByteString)
+hummerModel :: Dict (ModelField ByteString)
+b2cModel :: Dict (ModelField ByteString) -- FIXME: Is this correct?
+chartisModel :: Dict (ModelField ByteString) -- FIXME: Is this correct?
 
 -- Try map russian names of VW
 rusVW :: ByteString -> ByteString
@@ -306,182 +337,13 @@ rusVW s = fromMaybe s $ M.lookup s rus where
 		"Multivan"   <<~ ["Мультивен"],
 		"Sharan"     <<~ ["Шаран"]]
 
-chevroletModel = "carModel" ~:: oneOfNoCaseByte [
-	"Alero",
-	"Astra",
-	"Aveo",
-	"Beretta",
-	"Blazer",
-	"Camaro",
-	"Caprice",
-	"Captiva",
-	"Cavalier",
-	"Celta",
-	"Cheyenne",
-	"Cobalt",
-	"Colorado",
-	"Corsa",
-	"Corsa Wind",
-	"Corsica",
-	"Corvette",
-	"Epica",
-	"Evanda",
-	"Express",
-	"HHR",
-	"Ipanema GL",
-	"Jimmy",
-	"Kadett",
-	"Lacetti",
-	"lmpala",
-	"Lumina",
-	"Malibu",
-	"Matiz",
-	"Metro",
-	"Monte Carlo",
-	"Monza",
-	"NIVA",
-	"Omega",
-	"Prism",
-	"S-10",
-	"Sierra",
-	"SS",
-	"Suburban",
-	"Tacuma",
-	"Tahoe",
-	"Tracker Convertible",
-	"Tracker Hardtop",
-	"Trail Blazer",
-	"Trans Sport",
-	"Vectra",
-	"Venture",
-	"Zafira"]
-
-opelModel = "carModel" ~:: oneOfNoCaseByte [
-	"Agila",
-	"Antara",
-	"Astra",
-	"Calibra",
-	"Combo",
-	"Corsa",
-	"Frontera",
-	"Insignia",
-	"Kadett",
-	"Meriva",
-	"Monterey",
-	"Movano",
-	"Omega",
-	"Signum",
-	"Sintra",
-	"Tigra",
-	"Vectra",
-	"Vita",
-	"Vivaro",
-	"Zafira"]
-
-cadillacModel = "carModel" ~:: oneOfNoCaseByte [
-	"Allante",
-	"BLS",
-	"Brougham",
-	"Catera",
-	"CTS",
-	"DE Ville",
-	"DTS",
-	"Eldorado",
-	"Escalade",
-	"Fleetwood",
-	"LSE",
-	"Seville",
-	"SRX",
-	"STS",
-	"XLR"]
-
-vwModel = "carModel" ~:: oneOfNoCaseByte [
-	"Caddy",
-	"Amarok",
-	"Crafter",
-	"T5",
-	"Tiguan",
-	"Polo",
-	"Touareg",
-	"Passat",
-	"Jetta",
-	"Golf",
-	"Touran",
-	"Phaeton",
-	"Eos",
-	"Scirocco"]
-
-fordModel = "carModel" ~:: oneOfNoCaseByte [
-	"427",
-	"Aerostar",
-	"Aspire",
-	"Bronco",
-	"C-Max II",
-	"Contour",
-	"Cougar",
-	"Crown Victoria",
-	"Econoline",
-	"Escape",
-	"Escort",
-	"Escort Cabrio",
-	"Escort Classic",
-	"Escort Estate",
-	"Escort Hatchback",
-	"Escort Turnier",
-	"Escort ZX2",
-	"Excursion",
-	"Expedition",
-	"Explorer",
-	"Faction",
-	"Falcon GT",
-	"Fiesta",
-	"Focus",
-	"Fusion",
-	"Galaxy",
-	"Ford GT",
-	"Ikon",
-	"Ka",
-	"Maverick",
-	"Model U",
-	"Mondeo",
-	"Mustang",
-	"Probe",
-	"Puma",
-	"Ranger",
-	"Scorpio",
-	"Shelby GR",
-	"SportKa",
-	"StreetKa",
-	"Taurus",
-	"Thunderbird",
-	"Toureno Connect",
-	"Transit",
-	"Windstar"]
-
-bmwModel = "carModel" ~:: oneOfNoCaseByte [
-	"1 series",
-	"3 series",
-	"5 series",
-	"6 series",
-	"7 series",
-	"8 series",
-	"M3",
-	"M5",
-	"X1",
-	"X3",
-	"X5",
-	"X6",
-	"xActivity",
-	"Z1",
-	"Z3",
-	"Z4",
-	"Z8"]
-
-hummerModel = "carModel" ~:: oneOfNoCaseByte [
-	"H1",
-	"H2",
-	"H3"]
-
-b2cModel = "carModel" ~:: byteString
-chartisModel = "carModel" ~:: byteString
+chevroletModel = cars "chevy"
+opelModel = cars "opel"
+cadillacModel = cars "cad"
+vwModel = cars "vw"
+fordModel = cars "ford"
+bmwModel = cars "bmw"
+hummerModel = cars "hum"
+b2cModel = return ("carModel" ~:: byteString)
+chartisModel = return ("carModel" ~:: byteString)
 

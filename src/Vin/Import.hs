@@ -15,7 +15,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T (pack)
 
 import Vin.Model
-import Vin.Models (models)
+import Vin.Models (models, runDict)
 import Vin.Load
 import Vin.Store
 
@@ -52,5 +52,7 @@ importData ms ls from failed errors program content stats = do
     runResourceT $ (l $$ sinkXFile redisSetVin failed errors stats m)
 
 loadFile :: FilePath -> FilePath -> FilePath -> ByteString -> ByteString -> (Int -> Int -> IO ()) -> IO ()
-loadFile iFile eFile lFile pName cType stats =
-    importData models loaders iFile eFile lFile (C8.unpack pName) (C8.unpack cType) stats
+loadFile iFile eFile lFile pName cType stats = do
+    models' <- runDict models
+    models'' <- try models' $ "Unable to load models"
+    importData models'' loaders iFile eFile lFile (C8.unpack pName) (C8.unpack cType) stats

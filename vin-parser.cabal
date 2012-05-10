@@ -27,6 +27,7 @@ Library
     Vin.ModelField
     Vin.ModelField.Load
     Vin.Models
+    Vin.Models.Cars
     Vin.Utils
     Vin.Load
     Vin.Store
@@ -56,6 +57,7 @@ Library
     ,time
     ,transformers                >= 0.2 && < 0.4
     ,unix                        == 2.5.*
+    ,unordered-containers        == 0.2.*
     ,utf8-string
     ,xlsx-parser                 == 0.0.*
 
