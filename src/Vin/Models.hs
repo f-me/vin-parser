@@ -108,7 +108,7 @@ data MotorModel = MotorModel {
 
 vwMotor :: Dict Model
 vwMotor = withModel vwModel (<:: (column (encodeString "Модель") vwModelValue)) "vwMotor" [
-	carMaker <:= "VW",
+	carMaker <:= "vw",
 	-- vwModel <:: ((head . C8.words) <$> ("Модель" `typed` byteString)),
 	-- TODO: Split this column and extract motor & transmission
 	color <:: (column (encodeString "Цвет авт") vwColor),
@@ -161,7 +161,7 @@ vwMotor = withModel vwModel (<:: (column (encodeString "Модель") vwModelVa
 
 vwCommercial :: Dict Model
 vwCommercial = withModel vwModel (<:: ((mhead . C8.words) <$> ("модель" `typed` byteString))) "vwCommercial" [
-	carMaker <:= "VW",
+	carMaker <:= "vw",
 	sellDate <: "Дата продажи",
 	validUntil <: "Дата окончания карты",
 	companyName <: "Продавец",
@@ -226,7 +226,7 @@ vwRuslan :: Dict Model
 vwRuslan = withModel vwModel onModel "vwRuslan" [
 	cardNumber <: "№",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
-	carMaker <:= "VW",
+	carMaker <:= "vw",
 	vin <: "VIN номер Автомобиля VW",
 	serviceInterval <: "Межсервисный интервал",
 	lastTODate <: "Дата прохождения ТО (Дата регистрации в программе)",
@@ -246,7 +246,7 @@ chartis = withModel chartisModel (<:: capitalized "Модель Автомоби
 
 vwAvilon :: Dict Model
 vwAvilon = withModel vwModel (<: "Модель Автомобиля VW") "vwAvilon" [
-	carMaker <:= "VW",
+	carMaker <:= "vw",
 	cardNumber <: "Подрядковый номер клубной карты",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
 	vin <: "VIN номер Автомобиля VW",
@@ -257,7 +257,7 @@ vwAvilon = withModel vwModel (<: "Модель Автомобиля VW") "vwAvil
 
 atlantM :: Dict Model
 atlantM = withModel vwModel (<: "Модель Автомобиля VW") "atlant" [
-	carMaker <:= "VW",
+	carMaker <:= "vw",
 	cardNumber <: "Номер карты Atlant-M Assistance",
 	subProgramName <: "Тип программы",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",

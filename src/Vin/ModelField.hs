@@ -71,9 +71,9 @@ notNull :: FieldType ByteString -> FieldType ByteString
 notNull f = f { fieldReader = v } where
 	v = verify (not . C8.null) (const $ InvalidType "Field can't be empty") $ fieldReader f
 
-arcModelCode             = "arcModelCode"                   ~:: byteString
-carMaker                 = "carMake"                        ~:: carMakers
-carModel                 = "carModel"                       ~:: carModels
+arcModelCode             = "modelCode"                      ~:: byteString
+carMaker                 = "make"                           ~:: carMakers
+carModel                 = "model"                          ~:: carModels
 carMotor                 = "motor"                          ~:: byteString
 carTransmission          = "transmission"                   ~:: byteString
 cardNumber               = "cardNumber"                     ~:: byteString
@@ -86,7 +86,7 @@ contractNo               = "contractNo"                     ~:: byteString
 dealerCode               = "dealerCode"                     ~:: byteString
 dealerName               = "dealerName"                     ~:: byteString
 fddsId                   = "fddsId"                         ~:: byteString
-lastTODate               = "lastTODate"                     ~:: time
+lastTODate               = "checkupDate"                    ~:: time
 manager                  = "manager"                        ~:: byteString
 milageTO                 = "milageTO"                       ~:: byteString
 modelYear                = "modelYear"                      ~:: int
@@ -97,10 +97,10 @@ ownerEmail               = "ownerEmail"                     ~:: email
 ownerLATName             = "ownerLATName"                   ~:: byteString
 ownerName                = "ownerName"                      ~:: byteString
 ownerPhone               = "ownerPhone"                     ~:: phone
-plateNumber              = "plateNumber"                    ~:: byteString
+plateNumber              = "plateNum"                       ~:: byteString
 previousVin              = "vin2"                           ~:: upperByteString
 programRegistrationDate  = "programRegistrationDate"        ~:: time
-sellDate                 = "sellDate"                       ~:: time
+sellDate                 = "buyDate"                        ~:: time
 serviceInterval          = "serviceInterval"                ~:: int
 subProgramName           = "subProgramName"                 ~:: byteString
 validFrom                = "validFrom"                      ~:: time
