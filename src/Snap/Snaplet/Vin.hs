@@ -113,7 +113,7 @@ upload = ifTop $ do
     handleFileUploads d defaultUploadPolicy partUploadPolicy handler
         `catch` (writeText . fileUploadExceptionReason)
     where
-        partUploadPolicy _ = allowWithMaximumSize $ 100 * 2 ^ (20 :: Int)
+        partUploadPolicy _ = allowWithMaximumSize $ 2 ^ (30 :: Int)
         
         handler [] = writeBS "no files"
         handler ((info, f):_) = do

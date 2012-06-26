@@ -26,10 +26,10 @@ import Vin.Models.Cars
 
 -- | File with car models
 dictionaries :: FilePath
-dictionaries = "resources/static/js/data/dictionaries.json"
+dictionaries = "resources/site-config/dictionaries/CarModels.json"
 
 getCars :: Value -> String -> [String]
-getCars v c = maybe [] (map (T.unpack . label)) $ getMember v ["CarModels", "entries", c]
+getCars v c = maybe [] (map (T.unpack . label)) $ getMember v ["entries", c]
 
 -- | Dictionaried
 type Dict a = Reader Value a
