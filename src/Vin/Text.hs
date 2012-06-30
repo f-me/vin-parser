@@ -86,7 +86,8 @@ int :: FieldType Int
 int = FieldType (encodeString . show) $ do
     s <- fieldReader string
     let
-        result = case reads s of
+        s' = filter (not . isSpace) s
+        result = case reads s' of
             [(v, tl)] -> if all isSpace tl
                 then Just v
                 else Nothing
@@ -175,7 +176,9 @@ time = FieldType showTime times where
             "%e-%b-%Y",
             "%d-%b-%y",
             "%m-%d-%y",
-            "%b %Y"]
+            "%b %Y",
+            "%Y-%m-%dT%H:%M:%S",
+            "%d.%m.%Y %H:%M:%S"]
 
 -- | Phone number
 phone :: FieldType ByteString
@@ -184,8 +187,8 @@ phone = byteString
 -- | e-mail
 email :: FieldType ByteString
 email = FieldType id $ do
-	s <- fieldReader byteString
-	when (not $ isValid $ decodeString s) $ 
-		throwError $ strMsg $ "Invalid e-mail format: " ++ decodeString s
-	return s
-
+    s <- fieldReader byteString
+    let ss = decodeString s
+    when (not (null ss) && not (isValid ss)) $
+        throwError $ strMsg $ "Invalid e-mail format: " ++ decodeString s
+    return s

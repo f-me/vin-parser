@@ -63,6 +63,10 @@ mhead :: [ByteString] -> ByteString
 mhead [] = C8.empty
 mhead (l:_) = l
 
+mheads :: [String] -> String
+mheads [] = []
+mheads (l:_) = l
+
 withModel
 	:: Dict (ModelField ByteString)
 	-> (ModelField ByteString -> ModelRow)
@@ -160,7 +164,7 @@ vwMotor = withModel vwModel (<:: (column (encodeString "Модель") vwModelVa
 			maybe failed return $ listToMaybe $ mapMaybe fromTransmission $ C8.words c
 
 vwCommercial :: Dict Model
-vwCommercial = withModel vwModel (<:: ((mhead . C8.words) <$> ("модель" `typed` byteString))) "vwCommercial" [
+vwCommercial = withModel vwModel (<:: ((encodeString . mheads . words . decodeString) <$> ("модель" `typed` byteString))) "vwCommercial" [
 	carMaker <:= "vw",
 	sellDate <: "Дата продажи",
 	validUntil <: "Дата окончания карты",
@@ -209,7 +213,7 @@ chevroletKorea = withModel chevroletModel onModel "chevroletKorea" [
 	-- previousVin <: "Previous VIN (SKD)",
 	sellDate <: "Retail Date"]
 	where
-		onModel = (<:: ((mhead . C8.words) <$> ("Model" `typed` byteString)))
+		onModel = (<:: ((encodeString . mheads . words . decodeString) <$> ("Model" `typed` byteString)))
 
 cadillac :: Dict Model
 cadillac = withModel cadillacModel onModel "cadillac" [
