@@ -108,13 +108,13 @@ tableByte :: M.Map ByteString ByteString -> FieldType ByteString
 tableByte t = FieldType id $ do
     s <- fieldReader byteString
     case M.lookup s t of
-        Nothing -> throwError $ strMsg $ "Can't find valuw " ++ decodeString s ++ " in table"
+        Nothing -> throwError $ strMsg $ "Can't find value " ++ decodeString s ++ " in table"
         Just v -> return v
 
 -- | Table matching
 (<<~) :: String -> [String] -> M.Map ByteString ByteString
-result <<~ synonims = M.fromList $ zip rs s where
-    s = map encodeString synonims
+result <<~ synonims = M.fromList $ zip s rs where
+    s = map encodeString (result : synonims)
     rs = map encodeString $ repeat result
 
 -- | Value is one of

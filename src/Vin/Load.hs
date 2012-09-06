@@ -9,11 +9,14 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Map as M
 import Data.CSV.Conduit hiding (Row, MapRow)
 
-import qualified Data.Xlsx.Parser as Xlsx
+import qualified Codec.Xlsx.Parser as Xlsx
 
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
 import Vin.Utils
+
+type MapRow = M.Map T.Text T.Text
 
 -- | Load CSV
 csv
@@ -30,7 +33,7 @@ xlsx
     -> IO (Source m DataRow)
 xlsx f = do
     x <- Xlsx.xlsx f
-    return (Xlsx.sheetRows x 0 $= CL.map encode)
+    return (Xlsx.sheetRowSource x 0 $= CL.map encode)
 
 -- FIXME: Trick with IO used for xlsx to preload file and then create source from it
 -- I don't know the right way to do this
@@ -44,7 +47,7 @@ loaders = M.fromList [
 
 -- Old functions:
 
-encode :: Xlsx.MapRow -> DataRow
+encode :: MapRow -> DataRow
 encode m = M.map T.encodeUtf8 m' where
         m' = M.mapKeys T.encodeUtf8 m
 

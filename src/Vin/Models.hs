@@ -237,11 +237,12 @@ vwRuslan = withModel vwModel onModel "vwRuslan" [
 	milageTO <: "Величина пробега на момент регистрации в Программе",
 	validUntil <: "Программа действует до (Дата)"]
 	where
-		onModel = (<:: (rusVW <$> ("Модель Автомобиля VW" `typed` byteString)))
+		onModel = (<:: ("Модель Автомобиля VW" `typed` rusModel))
+		-- onModel = (<:: (rusVW <$> ("Модель Автомобиля VW" `typed` byteString)))
 
 chartis :: Dict Model
 chartis = withModel chartisModel (<:: capitalized "Модель Автомобиля") "chartis" [
-	cardNumber <: "№",
+	cardNumber <: "Подрядковый номер клубной карты",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
 	carMaker <:: capitalized "Марка Автомобиля",
 	vin <: "VIN номер Автомобиля",
@@ -320,26 +321,33 @@ hummerModel :: Dict (ModelField ByteString)
 b2cModel :: Dict (ModelField ByteString) -- FIXME: Is this correct?
 chartisModel :: Dict (ModelField ByteString) -- FIXME: Is this correct?
 
+-- Synonyms
+rusTable :: M.Map ByteString ByteString
+rusTable = M.unions [
+	"Caddy"      <<~ ["Кэдди", "кедди", "Кедди"],
+	"Crafter"    <<~ ["Крафтер"],
+	"Transporter"<<~ ["T5", "Т5", "Транспортер"],
+	"Tiguan"     <<~ ["Тигуан", "тигуан"],
+	"Polo"       <<~ ["Поло"],
+	"Touareg"    <<~ ["Туарег", "Тouareg"],
+	"Passat"     <<~ ["Пассат", "пассат", "Passft"],
+	"Jetta"      <<~ ["Джетта"],
+	"Golf"       <<~ ["Гольф", "гольф", "Гольф+"],
+	"Touran"     <<~ ["Туран"],
+	"Phaeton"    <<~ ["Фаэтон", "фаэтон"],
+	"Eos"        <<~ ["Эос"],
+	"Scirocco"   <<~ ["Сирокко"],
+	"Caravelle"  <<~ ["Каравелла"],
+	"Multivan"   <<~ ["Мультивен"],
+	"Sharan"     <<~ ["Шаран"]]
+
+-- rusModel
+rusModel :: FieldType ByteString
+rusModel = table rusTable
+
 -- Try map russian names of VW
 rusVW :: ByteString -> ByteString
-rusVW s = fromMaybe s $ M.lookup s rus where
-	rus = M.unions [
-		"Caddy"      <<~ ["Кэдди", "кедди", "Кедди"],
-		"Crafter"    <<~ ["Крафтер"],
-		"Transporter"<<~ ["T5", "Т5", "Транспортер"],
-		"Tiguan"     <<~ ["Тигуан", "тигуан"],
-		"Polo"       <<~ ["Поло"],
-		"Touareg"    <<~ ["Туарег", "Тouareg"],
-		"Passat"     <<~ ["Пассат", "пассат", "Passft"],
-		"Jetta"      <<~ ["Джетта"],
-		"Golf"       <<~ ["Гольф", "гольф", "Гольф+"],
-		"Touran"     <<~ ["Туран"],
-		"Phaeton"    <<~ ["Фаэтон", "фаэтон"],
-		"Eos"        <<~ ["Эос"],
-		"Scirocco"   <<~ ["Сирокко"],
-		"Caravelle"  <<~ ["Каравелла"],
-		"Multivan"   <<~ ["Мультивен"],
-		"Sharan"     <<~ ["Шаран"]]
+rusVW s = fromMaybe s $ M.lookup s rusTable
 
 chevroletModel = cars "chevy"
 opelModel = cars "opel"
