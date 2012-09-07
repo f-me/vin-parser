@@ -1,7 +1,7 @@
 -- | Module with common model fields
 -- for model definition
 module Vin.ModelField (
-    ModelField,
+    ModelField(..),
     (~::),
     (<::),
     (<:),
@@ -10,12 +10,6 @@ module Vin.ModelField (
     program,
     make,
     notNull,
-    arcModelCode, fddsId, vin, dealerCode, dealerName, validFrom, validUntil,
-    plateNumber, carMaker, carModel, carMotor, carTransmission, sellDate, programRegistrationDate,
-    milageTO, companyCode, companyLATName, lastTODate, color, modelYear, companyName,
-    contractNo, contractDate, ownerCompany, ownerContact, ownerName,
-    cardNumber, ownerAddress, ownerPhone, previousVin, manager,
-    serviceInterval, subProgramName, ownerLATName, ownerEmail,
     
     module Vin.Text,
     module Vin.Text.Specific
@@ -70,39 +64,3 @@ make m = ("make" ~:: string) <:: pure m
 notNull :: FieldType ByteString -> FieldType ByteString
 notNull f = f { fieldReader = v } where
 	v = verify (not . C8.null) (const $ InvalidType "Field can't be empty") $ fieldReader f
-
-arcModelCode             = "modelCode"                      ~:: byteString
-carMaker                 = "make"                           ~:: carMakers
-carModel                 = "model"                          ~:: carModels
-carMotor                 = "motor"                          ~:: byteString
-carTransmission          = "transmission"                   ~:: byteString
-cardNumber               = "cardNumber"                     ~:: byteString
-color                    = "color"                          ~:: byteString
-companyCode              = "companyCode"                    ~:: byteString
-companyLATName           = "companyLATName"                 ~:: byteString
-companyName              = "companyName"                    ~:: byteString
-contractDate             = "contractDate"                   ~:: time
-contractNo               = "contractNo"                     ~:: byteString
-dealerCode               = "dealerCode"                     ~:: byteString
-dealerName               = "dealerName"                     ~:: byteString
-fddsId                   = "fddsId"                         ~:: byteString
-lastTODate               = "checkupDate"                    ~:: time
-manager                  = "manager"                        ~:: byteString
-milageTO                 = "milageTO"                       ~:: byteString
-modelYear                = "modelYear"                      ~:: int
-ownerAddress             = "ownerAddress"                   ~:: byteString
-ownerCompany             = "ownerCompany"                   ~:: byteString
-ownerContact             = "ownerContact"                   ~:: byteString
-ownerEmail               = "ownerEmail"                     ~:: email
-ownerLATName             = "ownerLATName"                   ~:: byteString
-ownerName                = "ownerName"                      ~:: byteString
-ownerPhone               = "ownerPhone"                     ~:: phone
-plateNumber              = "plateNum"                       ~:: byteString
-previousVin              = "vin2"                           ~:: upperByteString
-programRegistrationDate  = "programRegistrationDate"        ~:: time
-sellDate                 = "buyDate"                        ~:: time
-serviceInterval          = "serviceInterval"                ~:: int
-subProgramName           = "subProgramName"                 ~:: byteString
-validFrom                = "validFrom"                      ~:: time
-validUntil               = "validUntil"                     ~:: time
-vin                      = "vin"                            ~:: notNull upperByteString

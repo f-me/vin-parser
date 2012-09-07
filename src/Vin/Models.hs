@@ -83,10 +83,8 @@ ford = withModel fordModel (<: "MODEL") "ford" [
 	-- fddsId <: "FDDS_ID",
 	companyCode <: "DEALER_CODE",
 	companyLATName <: "DEALER_NAME",
-	validFrom <: "VALID_FROM",
-	validUntil <: "VALID_TO",
+	checkupDate <: "VALID_FROM",
 	vin <: "VIN_NUMBER",
-	plateNumber <: "LICENCE_PLATE_NO",
 	--carMake               "carMake",
 	-- arcModelCode <: "ARC_MODEL_CODE",
 	sellDate <: "FIRST_REGISTRATION_DATE",
@@ -123,8 +121,7 @@ vwMotor = withModel vwModel (<:: (column (encodeString "Модель") vwModelVa
 	dealerCode <: "Код дилера получателя",
 	companyName <: "Дилер получатель",
 	contractNo <: "No Дог продажи Клиенту",
-	contractDate <: "Дата договора продажи",
-	sellDate <: "Дата передачи АМ Клиенту",
+	buyDate <: "Дата договора продажи",
 	ownerCompany <: "Компания покупатель",
 	ownerContact <: "Контактное лицо покупателя",
 	ownerName <: "Фактический получатель ам"]
@@ -181,15 +178,14 @@ vwCommercial = withModel vwModel (<:: ((encodeString . mheads . words . decodeSt
 opel :: Dict Model
 opel = withModel opelModel (<: "Model") "opel" [
 	carMaker <:: (("carMake" `typed` byteString) <|> (pure (encodeString "Opel"))),
-	vin <: "VIN",
+	vin <:: (("VIN" `typed` (modelFieldType vin)) <|> ("Previous VIN (SKD)" `typed` (modelFieldType vin))),
 	carMaker <:: (("Brand" `typed` byteString) <|> pure (encodeString "Opel")),
-	companyCode <: "Retail Dealer",
-	sellDate <: "Retail Date",
-	previousVin <: "Previous VIN (SKD)"]
+	seller <: "Retail Dealer",
+	sellDate <: "Retail Date"]
 
 hummer :: Dict Model
 hummer = withModel hummerModel (<:: (dropHummer <$> ("Model" `typed` byteString))) "hummer" [
-	companyCode <: "Retail Dealer",
+	seller <: "Retail Dealer",
 	sellDate <: "Retail Date",
 	carMaker <:"Brand",
 	vin <: "VIN RUS",
@@ -199,7 +195,7 @@ hummer = withModel hummerModel (<:: (dropHummer <$> ("Model" `typed` byteString)
 
 chevroletNAO :: Dict Model
 chevroletNAO = withModel chevroletModel (<: "Model") "chevroletNAO" [
-	companyCode <: "Retail Dealer",
+	seller <: "Retail Dealer",
 	sellDate <: "Retail Date",
 	carMaker <: "Brand",
 	vin <: "VIN RUS",
@@ -209,7 +205,7 @@ chevroletKorea :: Dict Model
 chevroletKorea = withModel chevroletModel onModel "chevroletKorea" [
 	carMaker <:: (("Brand" `typed` carModels) <|> pure (encodeString "")),
 	vin <: "VIN",
-	companyCode <: "Retail Dealer",
+	seller <: "Retail Dealer",
 	-- previousVin <: "Previous VIN (SKD)",
 	sellDate <: "Retail Date"]
 	where
@@ -217,7 +213,7 @@ chevroletKorea = withModel chevroletModel onModel "chevroletKorea" [
 
 cadillac :: Dict Model
 cadillac = withModel cadillacModel onModel "cadillac" [
-	companyCode <: "Retail Dealer",
+	seller <: "Retail Dealer",
 	sellDate <: "Retail Date",
 	carMaker <: "Brand",
 	vin <: "VIN RUS",
@@ -235,7 +231,8 @@ vwRuslan = withModel vwModel onModel "vwRuslan" [
 	serviceInterval <: "Межсервисный интервал",
 	lastTODate <: "Дата прохождения ТО (Дата регистрации в программе)",
 	milageTO <: "Величина пробега на момент регистрации в Программе",
-	validUntil <: "Программа действует до (Дата)"]
+	validUntil <: "Программа действует до (Дата)",
+	validUntilMilage <: "Программа действует до (Пробега)"]
 	where
 		onModel = (<:: ("Модель Автомобиля VW" `typed` rusModel))
 		-- onModel = (<:: (rusVW <$> ("Модель Автомобиля VW" `typed` byteString)))
@@ -264,7 +261,7 @@ atlantM :: Dict Model
 atlantM = withModel vwModel (<: "Модель Автомобиля VW") "atlant" [
 	carMaker <:= "vw",
 	cardNumber <: "Номер карты Atlant-M Assistance",
-	subProgramName <: "Тип программы",
+	programName <: "Тип программы",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
 	vin <: "VIN номер Автомобиля VW",
 	serviceInterval <: "Межсервисный интервал, км",
@@ -283,13 +280,24 @@ autocraft = withModel bmwModel (<: "Модель Автомобиля BMW") "aut
 	validUntil <: "Программа действует до (Даты)",
 	milageTO <: "Величина пробега на момент регистрации в Программе"]
 
+europlan :: Dict Model
+europlan = withModel europlanModel (<: "Модель автомобиля") "europlan" [
+	carMaker <: "Марка автомобиля",
+	cardNumber <: "Подрядковый номер клубной карты",
+	modelYear <: "Год выпуска автомобиля",
+	vin <: "VIN номер автомобиля",
+	validFrom <: "Дата регистрации в программе",
+	programName <: "Тип программы",
+	validUntil <: "Программа действует до (Дата)",
+	manager <: "ФИО ответственного лица, внесшего данные в XLS файл"]
+
 b2c :: Dict Model
 b2c = withModel b2cModel (<: "Модель автомобиля") "b2c" [
 	validFrom <: "Дата активации карты",
 	validUntil <: "Дата окончания срока дейсвия карты",
-	manager <: "ФИО сотрудника торговой точки",
+	manager <: "Сотрудник РАМК",
 	cardNumber <: "Номер карты",
-	subProgramName <: "Тип карты",
+	programName <: "Тип карты",
 	ownerName <:: wordsF ["Фамилия клиента", "Имя клиента", "Отчество клиента"],
 	ownerLATName <:: wordsF ["Фамилия клиента (Лат)", "Имя клиента (Лат)"],
 	ownerAddress <:: wordsF [
@@ -308,7 +316,7 @@ b2c = withModel b2cModel (<: "Модель автомобиля") "b2c" [
 
 models :: Dict [Model]
 models = sequence [ford, fordPlus, vwMotor, vwCommercial, opel, hummer, chevroletNAO,
-	chevroletKorea, cadillac, vwRuslan, chartis, vwAvilon, atlantM, autocraft,
+	chevroletKorea, cadillac, vwRuslan, chartis, vwAvilon, atlantM, autocraft, europlan,
 	b2c]
 
 chevroletModel :: Dict (ModelField ByteString)
@@ -318,6 +326,7 @@ vwModel :: Dict (ModelField ByteString)
 fordModel :: Dict (ModelField ByteString)
 bmwModel :: Dict (ModelField ByteString)
 hummerModel :: Dict (ModelField ByteString)
+europlanModel :: Dict (ModelField ByteString)
 b2cModel :: Dict (ModelField ByteString) -- FIXME: Is this correct?
 chartisModel :: Dict (ModelField ByteString) -- FIXME: Is this correct?
 
@@ -356,6 +365,47 @@ vwModel = cars "vw"
 fordModel = cars "ford"
 bmwModel = cars "bmw"
 hummerModel = cars "hum"
-b2cModel = return ("carModel" ~:: byteString)
-chartisModel = return ("carModel" ~:: byteString)
+europlanModel = return ("model" ~:: byteString)
+b2cModel = return ("model" ~:: byteString)
+chartisModel = return ("model" ~:: byteString)
 
+arcModelCode             = "modelCode"                      ~:: byteString
+buyDate                  = "buyDate"                        ~:: time
+carMaker                 = "make"                           ~:: carMakers
+carModel                 = "model"                          ~:: carModels
+carMotor                 = "motor"                          ~:: byteString
+carTransmission          = "transmission"                   ~:: byteString
+cardNumber               = "cardNumber"                     ~:: byteString
+checkupDate              = "checkupDate"                    ~:: time
+color                    = "color"                          ~:: byteString
+companyCode              = "companyCode"                    ~:: byteString
+companyLATName           = "companyLATName"                 ~:: byteString
+companyName              = "companyName"                    ~:: byteString
+contractDate             = "contractDate"                   ~:: time
+contractNo               = "contractNo"                     ~:: byteString
+dealerCode               = "dealerCode"                     ~:: byteString
+dealerName               = "dealerName"                     ~:: byteString
+fddsId                   = "fddsId"                         ~:: byteString
+lastTODate               = "checkupDate"                    ~:: time
+manager                  = "manager"                        ~:: byteString
+milageTO                 = "milageTO"                       ~:: byteString
+modelYear                = "makeYear"                      ~:: int
+ownerAddress             = "ownerAddress"                   ~:: byteString
+ownerCompany             = "ownerCompany"                   ~:: byteString
+ownerContact             = "ownerContact"                   ~:: byteString
+ownerEmail               = "ownerEmail"                     ~:: email
+ownerLATName             = "ownerLATName"                   ~:: byteString
+ownerName                = "ownerName"                      ~:: byteString
+ownerPhone               = "ownerPhone"                     ~:: phone
+plateNumber              = "plateNum"                       ~:: byteString
+previousVin              = "vin2"                           ~:: upperByteString
+programName              = "program"                        ~:: byteString
+programRegistrationDate  = "programRegistrationDate"        ~:: time
+sellDate                 = "buyDate"                        ~:: time
+seller                   = "seller"                         ~:: byteString
+serviceInterval          = "serviceInterval"                ~:: int
+subProgramName           = "subProgramName"                 ~:: byteString
+validFrom                = "validFrom"                      ~:: time
+validUntil               = "validUntil"                     ~:: time
+validUntilMilage         = "validUntilMilage"               ~:: int
+vin                      = "vin"                            ~:: notNull upperByteString

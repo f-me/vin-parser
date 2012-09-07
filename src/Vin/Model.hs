@@ -32,4 +32,3 @@ parse
     -> M.Map ByteString ByteString
     -> Either [RowError ByteString TypeError] [ByteString]
 parse m d = row d (sequenceA (map snd (modelFields m)))
-
