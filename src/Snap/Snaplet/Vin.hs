@@ -20,7 +20,6 @@ import           Data.Map (Map)
 import           Data.Map as M
 import           Data.Maybe
 import           GHC.Generics
-import           System.Directory (getTemporaryDirectory)
 
 import           Control.Monad.CatchIO (finally, catch)
 import           Control.Monad.State
@@ -33,6 +32,7 @@ import           Snap.Core
 import           Snap.Snaplet
 import           Snap.Util.FileUploads
 import           System.FilePath
+import           System.Directory
 import           System.Posix.Files (createLink, removeLink)
 
 import           Vin.Import
@@ -125,7 +125,8 @@ upload = ifTop $ do
 
 action :: ByteString -> PartInfo -> String -> Handler b Vin ()
 action program info f = do
-    liftIO $ createLink f f'
+    --liftIO $ createLink f f'
+    liftIO $ copyFile f fUploaded
     s <- gets _alerts
     liftIO $ do
         alertInsert s $ infoAlert (B.pack f) "Uploading..." partF
@@ -145,12 +146,12 @@ action program info f = do
                     show valid]
         
     liftIO $ forkIO $ do
-        loadFile f' fError fLog program (partContentType info) uploadStats
+        loadFile fUploaded fError fLog program (partContentType info) uploadStats
         `E.catches` [
             E.Handler (\(ex :: VinUploadException) -> return ()),
             E.Handler (\(ex :: E.SomeException) -> return ())]
         `finally` (do
-            removeLink f'
+            -- removeLink f'
             (total, valid) <- readMVar statsVar
             let
                 resultMessage = T.pack $ concat [
@@ -175,6 +176,7 @@ action program info f = do
         fLog = "resources/static/" ++ partFs ++ ".error.log"
         fErrorLink = "s/" ++ partFs ++ ".error.csv"
         fLogLink = "s/" ++ partFs ++ ".error.log"
+        fUploaded = "resources" </> "static" </> addExtension "uploaded" (takeExtension . T.unpack . T.decodeUtf8 $ partF)
         f' = f ++ "-link"
 
 getState :: Handler b Vin ()
