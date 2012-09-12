@@ -9,7 +9,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Map as M
 import Data.CSV.Conduit hiding (Row, MapRow)
 
-import qualified Data.Xlsx.Parser as Xlsx
+import qualified Codec.Xlsx.Parser as Xlsx
 
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -31,7 +31,7 @@ xlsx
     -> IO (Source m DataRow)
 xlsx f = do
     x <- Xlsx.xlsx f
-    return (Xlsx.sheetRows x 0 $= CL.map encode)
+    return (Xlsx.sheetSource x 0 Xlsx.convertToText Xlsx.convertToText $= CL.map encode)
 
 -- FIXME: Trick with IO used for xlsx to preload file and then create source from it
 -- I don't know the right way to do this

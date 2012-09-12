@@ -36,18 +36,17 @@ posix = posixLocale defaultTimeLocale
 -- | Dublin Julian date used it xlsx.
 dublin :: Error e => Field e ByteString POSIXTime
 dublin = field >>= toDublin where
-    toDublin str = case tryInteger (trim str) of
+    toDublin str = case tryDouble (trim str) of
         Nothing -> throwError $ strMsg $ "Unable to parse dublin time: " ++ decodeString str
         Just d -> return $ toPOSIX d
 
     trim = snd . C8.span isSpace . fst . C8.spanEnd isSpace
-    tryInteger s = do
-        (v, tl) <- C8.readInteger s
-        if C8.all isSpace tl
-            then return v
-            else Nothing
+    tryDouble s = case reads (C8.unpack s) of
+        [(v, "")] -> return v
+        _ -> Nothing
     
-    toPOSIX :: Integer -> POSIXTime
-    toPOSIX d = utcTimeToPOSIXSeconds utct where
-        day = ModifiedJulianDay $ d - 2 + 2415020 - 2400000
-        utct = UTCTime day 0
+    toPOSIX :: Double -> POSIXTime
+    toPOSIX d = toPOSIX' $ properFraction d where
+        toPOSIX' (d, tm) = utcTimeToPOSIXSeconds utct where
+            day = ModifiedJulianDay $ d - 2 + 2415020 - 2400000
+            utct = UTCTime day (fromInteger . floor $ tm * 60 * 60 * 24)

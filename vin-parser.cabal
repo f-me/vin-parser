@@ -59,7 +59,7 @@ Library
     ,unix                        == 2.5.*
     ,unordered-containers        == 0.2.*
     ,utf8-string
-    ,xlsx-parser
+    ,xlsx
 
   ghc-options: -Wall -fno-warn-unused-do-bind
 
