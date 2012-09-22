@@ -15,8 +15,6 @@ Library
   hs-source-dirs: src
   Exposed-Modules:
     Snap.Snaplet.Vin
-
-  Other-Modules:
     Vin.Field
     Vin.Row
     Vin.Text
@@ -32,6 +30,8 @@ Library
     Vin.Load
     Vin.Store
     Vin.Import
+
+  Other-Modules:
 
   Build-depends:
      aeson                       == 0.6.*
