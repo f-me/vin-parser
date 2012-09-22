@@ -130,7 +130,7 @@ action program info f = do
     liftIO $ copyFile f fUploaded
     s <- gets _alerts
     liftIO $ do
-        alertInsert s $ infoAlert (B.pack f) "Uploading..." partF
+        alertInsert s $ infoAlert (T.encodeUtf8 . T.pack $ f) "Uploading..." partF
     
     statsVar <- liftIO $ newMVar (0, 0)
 
@@ -138,7 +138,7 @@ action program info f = do
         uploadStats :: Int -> Int -> IO ()
         uploadStats total valid = do
             swapMVar statsVar (total, valid)
-            alertUpdate s $ infoAlert (B.pack f) msg partF
+            alertUpdate s $ infoAlert (T.encodeUtf8 . T.pack $ f) msg partF
             where
                 msg = T.pack $ concat [
                     "Uploading... total rows processed: ",
@@ -160,7 +160,7 @@ action program info f = do
                     show total,
                     ", rows uploaded: ",
                     show valid]
-                doneAlert = alertUpdate s $ (successAlert (B.pack f) resultMessage partF
+                doneAlert = alertUpdate s $ (successAlert (T.encodeUtf8 . T.pack $ f) resultMessage partF
                     `withErrorFile` fErrorLink
                     `withErrorLogFile` fLogLink)
             doneAlert)
@@ -183,7 +183,7 @@ action program info f = do
 initUploadState :: String -> Handler b Vin ()
 initUploadState f = do
     s <- gets _alerts
-    liftIO $ alertInsert s $ infoAlert (B.pack f) "Uploading..." (B.pack f)
+    liftIO $ alertInsert s $ infoAlert (T.encodeUtf8 . T.pack $ f) "Uploading..." (T.encodeUtf8 . T.pack $ f)
 
 uploadData :: String -> String -> Handler b Vin ()
 uploadData program f = do
@@ -194,7 +194,7 @@ uploadData program f = do
         uploadStats :: Int -> Int -> IO ()
         uploadStats total valid = do
             swapMVar statsVar (total, valid)
-            alertUpdate s $ infoAlert (B.pack f) msg (B.pack f)
+            alertUpdate s $ infoAlert (T.encodeUtf8 . T.pack $ f) msg (T.encodeUtf8 . T.pack $ f)
             where
                 msg = T.concat [
                     "Uploading... total rows processed: ",
@@ -215,7 +215,7 @@ uploadData program f = do
                     T.pack $ show total,
                     ", rows uploaded: ",
                     T.pack $ show valid]
-                doneAlert = alertUpdate s $ (successAlert (B.pack f) resultMessage (B.pack f)
+                doneAlert = alertUpdate s $ (successAlert (T.encodeUtf8 . T.pack $ f) resultMessage (T.encodeUtf8 . T.pack $ f)
                     `withErrorFile` fErrorLink
                     `withErrorLogFile` fLogLink)
             doneAlert)
