@@ -6,6 +6,7 @@
 module Snap.Snaplet.Vin
     ( Vin
     , vinInit
+    , initUploadState, uploadData, getState, removeAlert
     ) where
 
 import           Prelude hiding (catch)
@@ -146,7 +147,7 @@ action program info f = do
                     show valid]
         
     liftIO $ forkIO $ do
-        loadFile fUploaded fError fLog program (partContentType info) uploadStats
+        loadFile fUploaded fError fLog program (contentType . T.unpack . T.decodeUtf8 . partContentType $ info) uploadStats
         `E.catches` [
             E.Handler (\(ex :: VinUploadException) -> return ()),
             E.Handler (\(ex :: E.SomeException) -> return ())]
@@ -179,6 +180,59 @@ action program info f = do
         fUploaded = "resources" </> "static" </> addExtension "uploaded" (takeExtension . T.unpack . T.decodeUtf8 $ partF)
         f' = f ++ "-link"
 
+initUploadState :: String -> Handler b Vin ()
+initUploadState f = do
+    s <- gets _alerts
+    liftIO $ alertInsert s $ infoAlert (B.pack f) "Uploading..." (B.pack f)
+
+uploadData :: String -> String -> Handler b Vin ()
+uploadData program f = do
+    s <- gets _alerts
+    statsVar <- liftIO $ newMVar (0, 0)
+
+    let
+        uploadStats :: Int -> Int -> IO ()
+        uploadStats total valid = do
+            swapMVar statsVar (total, valid)
+            alertUpdate s $ infoAlert (B.pack f) msg (B.pack f)
+            where
+                msg = T.concat [
+                    "Uploading... total rows processed: ",
+                    T.pack $ show total,
+                    ", rows uploaded: ",
+                    T.pack $ show valid]
+
+    liftIO $ forkIO $ do
+        loadFile fUploaded fError fLog (T.encodeUtf8 . T.pack $ program) (extension $ takeExtension fUploaded) uploadStats
+        `E.catches` [
+            E.Handler (\(ex :: VinUploadException) -> return ()),
+            E.Handler (\(ex :: E.SomeException) -> return ())]
+        `finally` (do
+            (total, valid) <- readMVar statsVar
+            let
+                resultMessage = T.concat [
+                    "Done. Total rows processed: ",
+                    T.pack $ show total,
+                    ", rows uploaded: ",
+                    T.pack $ show valid]
+                doneAlert = alertUpdate s $ (successAlert (B.pack f) resultMessage (B.pack f)
+                    `withErrorFile` fErrorLink
+                    `withErrorLogFile` fLogLink)
+            doneAlert)
+
+    writeBS "Ok"
+    where
+        unquote "" = ""
+        unquote s
+            | head s == '"' = init . tail $ s
+            | otherwise = s
+        partFs = unquote f
+        fError = "resources" </> "static" </> (partFs ++ ".error.csv")
+        fLog = "resources" </> "static" </> (partFs ++ ".error.log")
+        fErrorLink = "s/" ++ partFs ++ ".error.csv"
+        fLogLink = "s/" ++ partFs ++ ".error.log"
+        fUploaded = "resources" </> "static" </> "fileupload" </> "report" </> "upload" </> "data" </> f
+
 getState :: Handler b Vin ()
 getState = do
     s <- gets _alerts
@@ -200,5 +254,5 @@ routes = [
 vinInit :: SnapletInit b Vin
 vinInit = makeSnaplet "vin" "Some description" Nothing $ do
     alerts' <- liftIO . newMVar $ Alerts M.empty
-    addRoutes routes
+    -- addRoutes routes
     return $ Vin alerts'

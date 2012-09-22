@@ -1,5 +1,7 @@
 module Vin.Import (
     VinUploadException(..),
+    ContentType,
+    contentType, extension,
     importData,
     loadFile
     ) where
@@ -24,13 +26,22 @@ try :: Maybe a -> String -> IO a
 try Nothing msg = throw $ VinUploadException (T.pack msg) Nothing
 try (Just x) _ = return x
 
+-- | Content type
+type ContentType = Either String String
+
+-- | By ContentType
+contentType :: String -> ContentType
+contentType = Left
+
+-- | By file extension
+extension :: String -> ContentType
+extension = Right
+
 -- | Import data
 -- TODO: Move to import
 importData
     :: [Model]
     -- ^ Models
-    -> M.Map String (Loader (ResourceT IO))
-    -- ^ Loaders
     -> FilePath
     -- ^ Input file
     -> FilePath
@@ -39,20 +50,21 @@ importData
     -- ^ Log file
     -> String
     -- ^ Program name
-    -> String
+    -> ContentType
     -- ^ Content type
     -> (Int -> Int -> IO ())
     -- ^ Progress
     -> IO ()
 
-importData ms ls from failed errors program content stats = do
-    loader <- try (M.lookup content ls) $ "Unknown loader"
+importData ms from failed errors program content stats = do
+    loader <- try (either (`M.lookup` loadersContentType) (`M.lookup` loadersExtension) content) "Unknown loader"
+    -- loader <- try (M.lookup content ls) $ "Unknown loader"
     m <- try (find ((== program) . modelProgram) ms) $ "Unknown program"
     l <- loader from
     runResourceT $ (l $$ sinkXFile redisSetVin failed errors stats m)
 
-loadFile :: FilePath -> FilePath -> FilePath -> ByteString -> ByteString -> (Int -> Int -> IO ()) -> IO ()
+loadFile :: FilePath -> FilePath -> FilePath -> ByteString -> ContentType -> (Int -> Int -> IO ()) -> IO ()
 loadFile iFile eFile lFile pName cType stats = do
     models' <- runDict models
     models'' <- try models' $ "Unable to load models"
-    importData models'' loaders iFile eFile lFile (C8.unpack pName) (C8.unpack cType) stats
+    importData models'' iFile eFile lFile (C8.unpack pName) cType stats

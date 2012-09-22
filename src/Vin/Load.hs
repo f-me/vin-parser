@@ -1,6 +1,6 @@
 module Vin.Load (
     csv, xlsx,
-    Loader, loaders
+    Loader, loadersContentType, loadersExtension
     ) where
 
 import Data.Conduit
@@ -38,10 +38,15 @@ xlsx f = do
 type Loader m = FilePath -> IO (Source m DataRow)
 
 -- | Loaders by content type
-loaders :: MonadResource m => M.Map String (Loader m)
-loaders = M.fromList [
+loadersContentType :: MonadResource m => M.Map String (Loader m)
+loadersContentType = M.fromList [
     ("text/csv", return . csv),
     ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx)]
+
+loadersExtension :: MonadResource m => M.Map String (Loader m)
+loadersExtension = M.fromList [
+    (".csv", return . csv),
+    (".xlsx", xlsx)]
 
 -- Old functions:
 
