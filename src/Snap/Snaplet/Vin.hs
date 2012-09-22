@@ -42,7 +42,7 @@ data Alert a = Alert {
     alertId :: a,
     alertType :: Text,
     alertMessage :: Text,
-    alertVinFile :: ByteString,
+    alertVinFile :: Text,
     alertErrorFile :: Maybe FilePath,
     alertErrorLogFile :: Maybe FilePath  }
         deriving (Eq, Ord, Read, Show, Generic)
@@ -66,7 +66,7 @@ deleteAlert k (Alerts m) = Alerts $ M.delete k m
 
 ------------------------------------------------------------------------------
 data Vin = Vin {
-    _alerts :: MVar (Alerts ByteString) }
+    _alerts :: MVar (Alerts Text) }
 
 makeLens ''Vin
 
@@ -83,19 +83,19 @@ alertDelete :: Ord a => MVar (Alerts a) -> a -> IO ()
 alertDelete mvar k = withAlerts mvar (deleteAlert k)
 
 -- | Generic alert
-alert :: Text -> a -> Text -> ByteString -> Alert a
+alert :: Text -> a -> Text -> Text -> Alert a
 alert t i msg vinFile = Alert i t msg vinFile Nothing Nothing
 
 -- | Info alert
-infoAlert :: a -> Text -> ByteString -> Alert a
+infoAlert :: a -> Text -> Text -> Alert a
 infoAlert = alert "info"
 
 -- | Success alert
-successAlert :: a -> Text -> ByteString -> Alert a
+successAlert :: a -> Text -> Text -> Alert a
 successAlert = alert "success"
 
 -- | Error alert
-errorAlert :: a -> Text -> ByteString -> Alert a
+errorAlert :: a -> Text -> Text -> Alert a
 errorAlert = alert "error"
 
 -- | Add error file to alert
@@ -130,7 +130,7 @@ action program info f = do
     liftIO $ copyFile f fUploaded
     s <- gets _alerts
     liftIO $ do
-        alertInsert s $ infoAlert (T.encodeUtf8 . T.pack $ f) "Uploading..." partF
+        alertInsert s $ infoAlert (T.pack f) "Uploading..." (T.decodeUtf8 partF)
     
     statsVar <- liftIO $ newMVar (0, 0)
 
@@ -138,13 +138,13 @@ action program info f = do
         uploadStats :: Int -> Int -> IO ()
         uploadStats total valid = do
             swapMVar statsVar (total, valid)
-            alertUpdate s $ infoAlert (T.encodeUtf8 . T.pack $ f) msg partF
+            alertUpdate s $ infoAlert (T.pack f) msg (T.decodeUtf8 partF)
             where
-                msg = T.pack $ concat [
+                msg = T.concat [
                     "Uploading... total rows processed: ",
-                    show total,
+                    T.pack . show $ total,
                     ", rows uploaded: ",
-                    show valid]
+                    T.pack . show $ valid]
         
     liftIO $ forkIO $ do
         loadFile fUploaded fError fLog program (contentType . T.unpack . T.decodeUtf8 . partContentType $ info) uploadStats
@@ -160,7 +160,7 @@ action program info f = do
                     show total,
                     ", rows uploaded: ",
                     show valid]
-                doneAlert = alertUpdate s $ (successAlert (T.encodeUtf8 . T.pack $ f) resultMessage partF
+                doneAlert = alertUpdate s $ (successAlert (T.pack f) resultMessage (T.decodeUtf8 partF)
                     `withErrorFile` fErrorLink
                     `withErrorLogFile` fLogLink)
             doneAlert)
@@ -183,7 +183,7 @@ action program info f = do
 initUploadState :: String -> Handler b Vin ()
 initUploadState f = do
     s <- gets _alerts
-    liftIO $ alertInsert s $ infoAlert (T.encodeUtf8 . T.pack $ f) "Uploading..." (T.encodeUtf8 . T.pack $ f)
+    liftIO $ alertInsert s $ infoAlert (T.pack f) "Uploading..." (T.pack f)
 
 uploadData :: String -> String -> Handler b Vin ()
 uploadData program f = do
@@ -194,7 +194,7 @@ uploadData program f = do
         uploadStats :: Int -> Int -> IO ()
         uploadStats total valid = do
             swapMVar statsVar (total, valid)
-            alertUpdate s $ infoAlert (T.encodeUtf8 . T.pack $ f) msg (T.encodeUtf8 . T.pack $ f)
+            alertUpdate s $ infoAlert (T.pack f) msg (T.pack f)
             where
                 msg = T.concat [
                     "Uploading... total rows processed: ",
@@ -215,7 +215,7 @@ uploadData program f = do
                     T.pack $ show total,
                     ", rows uploaded: ",
                     T.pack $ show valid]
-                doneAlert = alertUpdate s $ (successAlert (T.encodeUtf8 . T.pack $ f) resultMessage (T.encodeUtf8 . T.pack $ f)
+                doneAlert = alertUpdate s $ (successAlert (T.pack f) resultMessage (T.pack f)
                     `withErrorFile` fErrorLink
                     `withErrorLogFile` fLogLink)
             doneAlert)
@@ -243,7 +243,7 @@ removeAlert :: Handler b Vin ()
 removeAlert = do
     s <- gets _alerts
     res <- getParam "id"
-    maybe (return ()) (liftIO . alertDelete s) res
+    maybe (return ()) (liftIO . alertDelete s . T.decodeUtf8) res
 
 routes :: [(ByteString, Handler b Vin ())]
 routes = [
