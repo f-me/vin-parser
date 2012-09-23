@@ -53,18 +53,3 @@ loadersExtension = M.fromList [
 encode :: Xlsx.MapRow -> DataRow
 encode m = M.map T.encodeUtf8 m' where
         m' = M.mapKeys T.encodeUtf8 m
-
-{-
-loadXlsxFile
-    :: (Connection -> DataRow -> IO ())
-    -> FilePath
-    -> FilePath
-    -> TextModel
-    -> IO ()
-loadXlsxFile store fInput fError textModel = do
-    x <- Xlsx.xlsx fInput
-    runResourceT
-        $  Xlsx.sheetRows x 0
-        $= CL.map encode
-        $$ sinkXFile store fError textModel
--}

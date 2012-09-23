@@ -1,15 +1,14 @@
 Name:                vin-parser
-Version:             0.1
+Version:             0.1.1
 Synopsis:            Custom tool for transferring data from files to database.
-License:             MIT
-Author:              Timofey Cherganov
-Maintainer:          timofey@formalmethods.ru
+License:             BSD3
+Author:              Alexandr `voidex` Ruchkin
+Maintainer:          voidex@live.com
 
 Category:            Database
 Build-type:          Simple
 
--- Constraint on the version of Cabal needed to build this package.
-Cabal-version:       >=1.6
+Cabal-version:       >= 1.6
 
 Library
   hs-source-dirs: src
@@ -23,7 +22,6 @@ Library
     Vin.Text.Specific
     Vin.Model
     Vin.ModelField
-    Vin.ModelField.Load
     Vin.Models
     Vin.Models.Cars
     Vin.Utils
@@ -34,32 +32,30 @@ Library
   Other-Modules:
 
   Build-depends:
-     aeson                       == 0.6.*
-    ,base                        >= 4 && < 5
-    ,bytestring                  == 0.9.*
-    ,conduit                     == 0.4.*
-    ,containers
-    ,csv-conduit                 == 0.2.*
-    ,data-lens-template          == 2.1.*
-    ,directory                   == 1.1.*
-    ,filepath                    == 1.3.*
-    ,ghc-prim                    == 0.2.*
-    ,hedis                       == 0.4.*
-    ,email-validate              == 0.2.*
-    ,iconv                       == 0.4.*
-    ,MonadCatchIO-transformers   >= 0.2 && < 0.4
-    ,mtl                         >= 2 && < 3
-    ,old-locale
-    ,snap                        == 0.8.*
-    ,snap-core                   == 0.8.*
-    ,peggy                       == 0.3.*
-    ,text
-    ,time
-    ,transformers                >= 0.2 && < 0.4
-    ,unix                        == 2.5.*
-    ,unordered-containers        == 0.2.*
-    ,utf8-string
-    ,xlsx
+    aeson                       == 0.6.*,
+    base                        >= 4 && < 5,
+    bytestring                  == 0.9.*,
+    conduit                     == 0.4.*,
+    containers                  >= 0.4 && < 0.6,
+    csv-conduit                 == 0.2.*,
+    data-lens-template          == 2.1.*,
+    directory                   == 1.1.*,
+    filepath                    == 1.3.*,
+    ghc-prim                    == 0.2.*,
+    hedis                       == 0.4.*,
+    email-validate              == 0.2.*,
+    iconv                       == 0.4.*,
+    MonadCatchIO-transformers   >= 0.2 && < 0.4,
+    mtl                         >= 2 && < 3,
+    old-locale                  >= 1.0 && < 1.1,
+    snap                        == 0.8.*,
+    snap-core                   == 0.8.*,
+    text                        >= 0.11 && < 0.12,
+    time                        >= 1.4 && < 1.5,
+    transformers                >= 0.2 && < 0.4,
+    unix                        == 2.5.*,
+    unordered-containers        == 0.2.*,
+    xlsx                        >= 0.0.2 && < 0.1.0
 
   ghc-options: -Wall -fno-warn-unused-do-bind
 
