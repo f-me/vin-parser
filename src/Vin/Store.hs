@@ -131,7 +131,7 @@ writeIncorrect fp = do
 
 writeRows :: MonadResource m => FilePath -> Sink DataRow m FilePath
 writeRows fp
-    =  fromCSV csvSettings
+    =  (writeHeaders csvSettings >> fromCSV csvSettings)
     =$ sinkFile fp >> return fp
     where
         csvSettings = defCSVSettings { csvOutputColSep = ';' }
