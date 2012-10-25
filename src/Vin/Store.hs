@@ -19,6 +19,7 @@ import Data.Conduit.Binary
 import qualified Data.Conduit.List as CL
 import Data.CSV.Conduit hiding (Row, MapRow)
 
+import Data.Char (isSpace)
 import Data.List (intercalate)
 import qualified Data.Map as M
 import Data.Text as T (Text)
@@ -63,6 +64,10 @@ parseRow m r = case parse m r of
     Left e -> Left (r, e)
     Right s -> Right $ M.fromList $ zip (map fst (modelFields m)) s
 
+trimKeys :: DataRow -> DataRow
+trimKeys = M.mapKeys trim where
+    trim = fst . C8.spanEnd isSpace . snd . C8.span isSpace
+
 sinkXFile
     :: MonadResource m
     => (R.Connection -> DataRow -> IO ())
@@ -72,7 +77,8 @@ sinkXFile
     -> Model
     -> Sink DataRow m ()
 sinkXFile store fError fLog stats ml
-    =  CL.map (parseRow ml)
+    =   CL.map trimKeys
+    =$ CL.map (parseRow ml)
     =$ storeCorrect ml store stats
     =$ storeErrorLog fLog
     =$ CL.map encodeCP1251
