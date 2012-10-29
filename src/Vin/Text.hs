@@ -20,7 +20,7 @@ import Control.Monad.Error
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 
-import Data.Char (toUpper, isSpace, toLower)
+import Data.Char (toUpper, isSpace, toLower, isDigit)
 
 import Data.Function
 
