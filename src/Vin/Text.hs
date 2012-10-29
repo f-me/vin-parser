@@ -75,10 +75,10 @@ intByte :: FieldType Int
 intByte = FieldType (encodeString . show) $ do
     s <- fieldReader byteString
     let
-        s' = C8.takeWhile isDigit . C8.filter (not . isSpace) $ s
+        (s', tl) = C8.break (== '.') . C8.filter (not . isSpace) $ s
         result = do
-            (v, tl) <- C8.readInt s'
-            if tl == "" || tl == ".0"
+            (v, tl') <- C8.readInt s'
+            if tl' == "" && (tl == "" || tl == ".0")
                 then return v
                 else Nothing
         onError = throwError $ strMsg $ "Unable to convert field " ++ decodeString s ++ " to int"
@@ -89,9 +89,9 @@ int :: FieldType Int
 int = FieldType (encodeString . show) $ do
     s <- fieldReader string
     let
-        s' = takeWhile isDigit . filter (not . isSpace) $ s
+        (s', tl) = break (== '.') . filter (not . isSpace) $ s
         result = case reads s' of
-            [(v, tl)] -> if tl == "" || tl == ".0"
+            [(v, "")] -> if tl == "" || tl == ".0"
                 then Just v
                 else Nothing
             _ -> Nothing
