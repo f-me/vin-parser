@@ -17,7 +17,7 @@ module Vin.ModelField (
     ) where
 
 import Control.Applicative
-import Control.Monad.Error
+import Control.Monad.Error ()
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import Data.String ()
@@ -43,7 +43,7 @@ f <:: act = connectToRow f act
 
 -- | Connect field with one column
 (<:) :: ModelField a -> String -> ModelRow
-f <: name = f <:: (name `typed` (modelFieldType f))
+f <: name = f <:: (name `typed` modelFieldType f)
 
 -- | Constant value
 (<:=) :: ModelField ByteString -> String -> ModelRow

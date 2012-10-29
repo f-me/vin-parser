@@ -22,7 +22,7 @@ import Data.Char (toUpper, isSpace, toLower)
 
 import Data.Function
 
-import Data.List (intercalate, find)
+import Data.List (intercalate, find, stripPrefix)
 import qualified Data.Map as M
 
 import Data.Time.Clock.POSIX
@@ -86,9 +86,10 @@ int :: FieldType Int
 int = FieldType (encodeString . show) $ do
     s <- fieldReader string
     let
+        only0 = maybe False (all isSpace) . stripPrefix ".0"
         s' = filter (not . isSpace) s
         result = case reads s' of
-            [(v, tl)] -> if all isSpace tl
+            [(v, tl)] -> if (all isSpace tl) || only0 tl
                 then Just v
                 else Nothing
             _ -> Nothing

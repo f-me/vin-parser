@@ -40,7 +40,7 @@ extension = Right
 -- | Import data
 -- TODO: Move to import
 importData
-    :: [Model]
+    :: (String -> Maybe Model)
     -- ^ Models
     -> FilePath
     -- ^ Input file
