@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 -- | Module for textual fields
 module Vin.Text (
     FieldType(..),
@@ -22,7 +24,7 @@ import Data.Char (toUpper, isSpace, toLower)
 
 import Data.Function
 
-import Data.List (intercalate, find, stripPrefix)
+import Data.List (intercalate, find)
 import qualified Data.Map as M
 
 import Data.Time.Clock.POSIX
@@ -73,9 +75,10 @@ intByte :: FieldType Int
 intByte = FieldType (encodeString . show) $ do
     s <- fieldReader byteString
     let
+        s' = C8.takeWhile isDigit . C8.filter (not . isSpace) $ s
         result = do
-            (v, tl) <- C8.readInt s
-            if C8.all isSpace tl
+            (v, tl) <- C8.readInt s'
+            if tl == "" || tl == ".0"
                 then return v
                 else Nothing
         onError = throwError $ strMsg $ "Unable to convert field " ++ decodeString s ++ " to int"
@@ -86,10 +89,9 @@ int :: FieldType Int
 int = FieldType (encodeString . show) $ do
     s <- fieldReader string
     let
-        only0 = maybe False (all isSpace) . stripPrefix ".0"
-        s' = filter (not . isSpace) s
+        s' = takeWhile isDigit . filter (not . isSpace) $ s
         result = case reads s' of
-            [(v, tl)] -> if (all isSpace tl) || only0 tl
+            [(v, tl)] -> if tl == "" || tl == ".0"
                 then Just v
                 else Nothing
             _ -> Nothing
