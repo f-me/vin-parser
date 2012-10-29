@@ -40,7 +40,7 @@ extension = Right
 -- | Import data
 -- TODO: Move to import
 importData
-    :: [Model]
+    :: (String -> Maybe Model)
     -- ^ Models
     -> FilePath
     -- ^ Input file
@@ -59,7 +59,7 @@ importData
 importData ms from failed errors program content stats = do
     loader <- try (either (`M.lookup` loadersContentType) (`M.lookup` loadersExtension) content) "Unknown loader"
     -- loader <- try (M.lookup content ls) $ "Unknown loader"
-    m <- try (find ((== program) . modelProgram) ms) $ "Unknown program"
+    m <- try (ms program) $ "Unknown program"
     l <- loader from
     runResourceT $ (l $$ sinkXFile redisSetVin failed errors stats m)
 

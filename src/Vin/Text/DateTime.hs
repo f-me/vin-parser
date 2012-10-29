@@ -47,6 +47,6 @@ dublin = field >>= toDublin where
     
     toPOSIX :: Double -> POSIXTime
     toPOSIX d = toPOSIX' $ properFraction d where
-        toPOSIX' (d, tm) = utcTimeToPOSIXSeconds utct where
-            day = ModifiedJulianDay $ d - 2 + 2415020 - 2400000
+        toPOSIX' (d', tm) = utcTimeToPOSIXSeconds utct where
+            day = ModifiedJulianDay $ d' - 2 + 2415020 - 2400000
             utct = UTCTime day (fromInteger . floor $ tm * 60 * 60 * 24)
