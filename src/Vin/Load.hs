@@ -11,7 +11,6 @@ import Data.CSV.Conduit hiding (Row, MapRow)
 
 import qualified Codec.Xlsx.Parser as Xlsx
 
-import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
 import Vin.Utils

@@ -1,5 +1,4 @@
 module Vin.Text.Specific (
-    colors,
     carModels,
     carMakers
     ) where
@@ -8,10 +7,6 @@ import Data.ByteString (ByteString)
 import qualified Data.Map as M
 
 import Vin.Text
-
--- | Car colors
-colors :: FieldType ByteString
-colors = oneOf ["red", "green", "blue"]
 
 (<<=~) :: String -> [String] -> M.Map ByteString ByteString
 str <<=~ alts = str <<~ (str : alts)

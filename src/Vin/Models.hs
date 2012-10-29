@@ -2,7 +2,7 @@
 
 -- | Module with model definitions
 module Vin.Models (
-	runWithDict, runDict,
+	runWithDicts, runDict,
     models
     ) where
 
@@ -14,10 +14,11 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import Data.Char
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
-import Data.List (find, elem)
+import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Traversable hiding (sequence)
+import qualified Data.Text.Encoding as T
+import Data.Traversable hiding (sequence, forM)
 
 import Vin.Row (column)
 import Vin.Model
@@ -28,28 +29,94 @@ import Vin.Models.Cars
 dictionaries :: FilePath
 dictionaries = "resources/site-config/dictionaries/CarModels.json"
 
+makers :: FilePath
+makers = "resources/site-config/dictionaries/CarMakers.json"
+
+programs :: FilePath
+programs = "resources/site-config/dictionaries/Programs.json"
+
+colors :: FilePath
+colors = "resources/site-config/dictionaries/Colors.json"
+
 getCars :: Value -> String -> [String]
 getCars v c = maybe [] (map (T.unpack . label)) $ getMember v ["entries", c]
 
+getCarsReverseMap :: Value -> String -> M.Map ByteString ByteString
+getCarsReverseMap v c = maybe M.empty (M.unions . map mk) $ getMember v ["entries", c] where
+	mk e = M.singleton (T.encodeUtf8 . label $ e) (T.encodeUtf8 . value $ e)
+
+getReverseMap :: Value -> M.Map ByteString ByteString
+getReverseMap v = maybe M.empty (M.unions . map mk) $ getMember v ["entries"] where
+	mk e = M.singleton (T.encodeUtf8 . label $ e) (T.encodeUtf8 . value $ e)
+
+getMakers :: Value -> M.Map ByteString ByteString
+getMakers = getReverseMap
+
+getPrograms :: Value -> [String]
+getPrograms v = maybe [] (map (T.unpack . value)) $ getMember v ["entries"]
+
+getColors :: Value -> M.Map ByteString ByteString
+getColors = getReverseMap
+
+data CarDictionaries = CarDictionaries {
+	modelsDict :: Value,
+	makersDict :: Value,
+	programsDict :: Value,
+	colorsDict :: Value }
+		deriving (Eq, Show)
+
 -- | Dictionaried
-type Dict a = Reader Value a
+type Dict a = Reader CarDictionaries a
 
 -- | Cars reader
 cars :: String -> Dict (ModelField ByteString)
 cars s = do
-	cars' <- asks (`getCars` s)
-	return ("carModel" ~:: oneOfNoCaseByte cars')
+	cars' <- asks ((`getCarsReverseMap` s) . modelsDict)
+	return ("model" ~:: table cars')
+
+-- | Gets model-value by make-label and model-label
+allCars :: Dict (M.Map ByteString (M.Map ByteString ByteString))
+allCars = do
+	mk' <- asks (getMakers . makersDict)
+	fmap M.unions $ forM (M.toList mk') $ \(mkLabel, mkValue) -> do
+		cs' <- asks ((`getCarsReverseMap` (T.unpack . T.decodeUtf8 $ mkValue)) . modelsDict)
+		return $ M.singleton mkLabel cs'
+
+-- | Cars reader
+carsList :: String -> Dict (ModelField ByteString)
+carsList s = do
+	cars' <- asks ((`getCars` s) . modelsDict)
+	return ("model" ~:: oneOfNoCaseByte cars')
+
+makersTable :: Dict (ModelField ByteString)
+makersTable = do
+	mk' <- asks (getMakers . makersDict)
+	return ("make" ~:: table mk')
+
+programsList :: Dict [String]
+programsList = asks (getPrograms . programsDict)
+
+colorsTable :: Dict (ModelField ByteString)
+colorsTable = do
+	c' <- asks (getColors . colorsDict)
+	return ("color" ~:: table c')
 
 -- | Run with dictionary
-runWithDict :: FilePath -> Dict a -> IO (Maybe a)
-runWithDict f act = fmap (fmap (runReader act)) $ loadValue f
+runWithDicts :: FilePath -> FilePath -> FilePath -> FilePath -> Dict a -> IO (Maybe a)
+runWithDicts fc fm fp fcl act = do
+	c <- loadValue fc
+	m <- loadValue fm
+	p <- loadValue fp
+	cl <- loadValue fcl
+	return $ fmap (runReader act) $ CarDictionaries <$> c <*> m <*> p <*> cl
+-- runWithDicts f act = fmap (fmap (runReader act)) $ loadValue f
 
 -- | Run default dictionary
 runDict :: Dict a -> IO (Maybe a)
-runDict = runWithDict dictionaries
+runDict = runWithDicts dictionaries makers programs colors
 
 wordsF :: [String] -> Text ByteString
-wordsF ws = C8.unwords <$> (sequenceA $ map (`typed` byteString) ws)
+wordsF ws = C8.unwords <$> sequenceA (map (`typed` byteString) ws)
 
 capitalized :: String -> Text ByteString
 capitalized name = (capitalize . C8.uncons) <$> (name `typed` byteString) where
@@ -109,14 +176,14 @@ data MotorModel = MotorModel {
 		deriving (Eq, Ord, Read, Show)
 
 vwMotor :: Dict Model
-vwMotor = withModel vwModel (<:: (column (encodeString "Модель") vwModelValue)) "vwMotor" [
+vwMotor = withModel vwModel (<:: column (encodeString "Модель") vwModelValue) "vwMotor" [
 	carMaker <:= "vw",
 	-- vwModel <:: ((head . C8.words) <$> ("Модель" `typed` byteString)),
 	-- TODO: Split this column and extract motor & transmission
-	color <:: (column (encodeString "Цвет авт") vwColor),
+	color <:: column (encodeString "Цвет авт") vwColor,
 	carMotor <:: (column (encodeString "Модель") vwMotorType <|> pure ""),
-	carTransmission <:: (column (encodeString "Модель") vwTransmission),
-	modelYear <: "Модельный год",
+	carTransmission <:: column (encodeString "Модель") vwTransmission,
+	makeYear <: "Модельный год",
 	vin <: "VIN",
 	dealerCode <: "Код дилера получателя",
 	companyName <: "Дилер получатель",
@@ -131,7 +198,7 @@ vwMotor = withModel vwModel (<:: (column (encodeString "Модель") vwModelVa
 			c <- fieldReader byteString
 			let
 				res = fst . C8.breakEnd (== '`') . snd . C8.break (== '`') $ c
-			return $ if C8.length res < 2 then C8.empty else (C8.init . C8.tail $ res)
+			return $ if C8.length res < 2 then C8.empty else C8.init . C8.tail $ res
 
 		vwModelValue :: TextField ByteString
 		vwModelValue = do
@@ -153,10 +220,10 @@ vwMotor = withModel vwModel (<:: (column (encodeString "Модель") vwModelVa
 			let
 				failed = throwError $ strMsg $ "Can't extract transmission " ++ decodeString c
 				fromTransmission s
-					| (encodeString "авт.-") `C8.isPrefixOf` s = Just (encodeString "auto")
-					| (encodeString "авт,-") `C8.isPrefixOf` s = Just (encodeString "auto")
-					| (encodeString "ручн.-") `C8.isPrefixOf` s = Just (encodeString "mech")
-					| (encodeString "ручн,-") `C8.isPrefixOf` s = Just (encodeString "mech")
+					| encodeString "авт.-" `C8.isPrefixOf` s = Just (encodeString "auto")
+					| encodeString "авт,-" `C8.isPrefixOf` s = Just (encodeString "auto")
+					| encodeString "ручн.-" `C8.isPrefixOf` s = Just (encodeString "mech")
+					| encodeString "ручн,-" `C8.isPrefixOf` s = Just (encodeString "mech")
 					| otherwise = Nothing
 			maybe failed return $ listToMaybe $ mapMaybe fromTransmission $ C8.words c
 
@@ -168,7 +235,7 @@ vwCommercial = withModel vwModel (<:: ((encodeString . mheads . words . decodeSt
 	companyName <: "Продавец",
 	cardNumber <: "№ карты",
 	vin <: "VIN",
-	modelYear <: "модельный год",
+	makeYear <: "модельный год",
 	plateNumber <: "госномер",
 	ownerName <:: wordsF ["имя", "фамилия", "отчество"],
 	ownerAddress <:: wordsF ["адрес частного лица или организации", "город", "индекс"],
@@ -177,8 +244,8 @@ vwCommercial = withModel vwModel (<:: ((encodeString . mheads . words . decodeSt
 
 opel :: Dict Model
 opel = withModel opelModel (<: "Model") "opel" [
-	carMaker <:: (("carMake" `typed` byteString) <|> (pure (encodeString "Opel"))),
-	vin <:: (("VIN" `typed` (modelFieldType vin)) <|> ("Previous VIN (SKD)" `typed` (modelFieldType vin))),
+	carMaker <:: (("carMake" `typed` byteString) <|> pure (encodeString "Opel")),
+	vin <:: (("VIN" `typed` modelFieldType vin) <|> ("Previous VIN (SKD)" `typed` modelFieldType vin)),
 	carMaker <:: (("Brand" `typed` byteString) <|> pure (encodeString "Opel")),
 	seller <: "Retail Dealer",
 	sellDate <: "Retail Date"]
@@ -284,7 +351,7 @@ europlan :: Dict Model
 europlan = withModel europlanModel (<: "Модель автомобиля") "europlan" [
 	carMaker <: "Марка автомобиля",
 	cardNumber <: "Подрядковый номер клубной карты",
-	modelYear <: "Год выпуска автомобиля",
+	makeYear <: "Год выпуска автомобиля",
 	vin <: "VIN номер автомобиля",
 	validFrom <: "Дата регистрации в программе",
 	programName <: "Тип программы",
@@ -309,15 +376,50 @@ b2c = withModel b2cModel (<: "Модель автомобиля") "b2c" [
 	ownerPhone <:: wordsF ["Телефон клиента Мобильный", "Телефон клиента Домашний"],
 	ownerEmail <: "Е-МAIL клиента",
 	carMaker <:: capitalized "Марка автомобиля",
-	modelYear <: "Год выпуска",
+	makeYear <: "Год выпуска",
 	plateNumber <: "Гос номер",
 	vin <: "Идентификационный номер (VIN)",
 	ownerContact <:: wordsF ["Фамилия доверенного лица", "Имя доверенного лица", "Отчество доверенного лица"]]
 
-models :: Dict [Model]
-models = sequence [ford, fordPlus, vwMotor, vwCommercial, opel, hummer, chevroletNAO,
-	chevroletKorea, cadillac, vwRuslan, chartis, vwAvilon, atlantM, autocraft, europlan,
-	b2c]
+universal :: Dict (String -> Model)
+universal = do
+	fmake <- makersTable
+	col <- colorsTable
+	allCarModels <- allCars
+	let
+		lookupModel mk mdl = fromMaybe "" $ do
+			mkDict <- M.lookup mk allCarModels
+			M.lookup mdl mkDict
+		checkModel :: FieldType ByteString
+		checkModel = verifyType (not . C8.null) "Invalid car model" byteString
+	return $ \p -> model' p [
+		vin <: "VIN",
+		callTaker <: "Сотрудник РАМК",
+		("owner_name" ~:: byteString) <: "ФИО владельца",
+		("owner_phone1" ~:: byteString) <: "Контактный телефон владельца",
+		("owner_email" ~:: email) <: "Email владельца",
+		fmake <: "Марка",
+		("model" ~:: checkModel) <:: (lookupModel <$> ("Марка" `typed` byteString) <*> ("Модель" `typed` byteString)),
+		plateNumber <: "Госномер",
+		makeYear <: "Год производства автомобиля",
+		col <: "Цвет",
+		buyDate <: "Дата покупки",
+		checkupDate <: "Дата последнего ТО",
+		cardNumber <: "Номер карты участника",
+		validFrom <: "Дата регистрации в программе",
+		validUntil <: "Программа действует до (дата)",
+		validUntilMilage <: "Программа действует до (пробег)",
+		milageTO <: "Пробег при регистрации в программе",
+		serviceInterval <: "Межсервисный интервал",
+		("cardOwner" ~:: byteString) <: "ФИО владельца карты",
+		manager <: "ФИО менеджера"]
+
+models :: Dict (String -> Maybe Model)
+models = do
+	m <- sequence [ford, fordPlus, vwMotor, vwCommercial, opel, hummer, chevroletNAO, chevroletKorea, cadillac, vwRuslan, chartis, vwAvilon, atlantM, autocraft, europlan, b2c]
+	u <- universal
+	ps <- programsList
+	return $ \p -> find ((== p) . modelProgram) m <|> fmap u (find (== p) ps)
 
 chevroletModel :: Dict (ModelField ByteString)
 opelModel :: Dict (ModelField ByteString)
@@ -371,6 +473,7 @@ chartisModel = return ("model" ~:: byteString)
 
 arcModelCode             = "modelCode"                      ~:: byteString
 buyDate                  = "buyDate"                        ~:: time
+callTaker                 = "callTaker"                      ~:: byteString
 carMaker                 = "make"                           ~:: carMakers
 carModel                 = "model"                          ~:: carModels
 carMotor                 = "motor"                          ~:: byteString
@@ -389,7 +492,7 @@ fddsId                   = "fddsId"                         ~:: byteString
 lastTODate               = "checkupDate"                    ~:: time
 manager                  = "manager"                        ~:: byteString
 milageTO                 = "milageTO"                       ~:: byteString
-modelYear                = "makeYear"                      ~:: int
+makeYear                = "makeYear"                      ~:: int
 ownerAddress             = "ownerAddress"                   ~:: byteString
 ownerCompany             = "ownerCompany"                   ~:: byteString
 ownerContact             = "ownerContact"                   ~:: byteString

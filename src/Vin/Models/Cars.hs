@@ -1,17 +1,17 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Vin.Models.Cars (
     loadValue,
     getObject, getMember,
-    Label(..)
+    Entry(..)
     ) where
 
 import Control.Applicative
 import Data.Aeson
-import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as C8
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
 
-import System.FilePath
 
 -- | Load JSON value from file
 loadValue :: FilePath -> IO (Maybe Value)
@@ -32,9 +32,11 @@ getMember v m = do
         Error _ -> Nothing
 
 -- | Car label
-data Label = Label {
+data Entry = Entry {
+    value :: T.Text,
     label :: T.Text }
         deriving (Eq, Ord, Read, Show)
 
-instance FromJSON Label where
-    parseJSON (Object v) = Label <$> v .: (T.pack "label")
+instance FromJSON Entry where
+    parseJSON (Object v) = Entry <$> (v .: "value") <*> (v .: "label")
+    parseJSON _ = empty

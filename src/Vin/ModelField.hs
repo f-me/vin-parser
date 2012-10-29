@@ -10,21 +10,22 @@ module Vin.ModelField (
     program,
     make,
     notNull,
+    verifyType,
     
     module Vin.Text,
     module Vin.Text.Specific
     ) where
 
 import Control.Applicative
+import Control.Monad.Error
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
-import Data.String
+import Data.String ()
 
 import Vin.Field (verify)
 import Vin.Row
 import Vin.Model
 import Vin.Text
-import Vin.Text.String
 import Vin.Text.Specific
 
 -- | Model field
@@ -62,5 +63,9 @@ make m = ("make" ~:: string) <:: pure m
 
 -- | Not null string
 notNull :: FieldType ByteString -> FieldType ByteString
-notNull f = f { fieldReader = v } where
-	v = verify (not . C8.null) (const $ InvalidType "Field can't be empty") $ fieldReader f
+notNull = verifyType (not . C8.null) "Field can't be empty"
+
+-- | Verify field
+verifyType :: (a -> Bool) -> String -> FieldType a -> FieldType a
+verifyType p s f = f { fieldReader = v } where
+    v = verify p (const $ InvalidType s) $ fieldReader f
