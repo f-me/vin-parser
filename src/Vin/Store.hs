@@ -17,6 +17,7 @@ import qualified Data.ByteString.Char8 as C8
 import Data.Conduit
 import Data.Conduit.Binary
 import qualified Data.Conduit.List as CL
+import Data.Conduit.Util hiding (zip)
 import Data.CSV.Conduit hiding (Row, MapRow)
 
 import Data.Char (isSpace)

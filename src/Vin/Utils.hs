@@ -4,10 +4,11 @@ module Vin.Utils (
     ) where
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
 
-import Codec.Text.IConv
+import Data.Encoding (decodeStrictByteString, encodeStrictByteString)
+import Data.Encoding.CP1251
 
 import qualified Data.Map as M
 
@@ -17,10 +18,11 @@ encodeCP1251 :: DataRow -> DataRow
 encodeCP1251 m = M.map enc m'
   where
     m' = M.mapKeys enc m
-    enc s = B.concat . L.toChunks . convert "UTF-8" "CP1251" $ L.fromChunks [s]
+    enc bs = encodeStrictByteString CP1251 $ B.unpack bs
 
 decodeCP1251 :: DataRow -> DataRow
 decodeCP1251 m = M.map enc m'
   where
     m' = M.mapKeys enc m
-    enc s = B.concat . L.toChunks . convert "CP1251" "UTF-8" $ L.fromChunks [s]
+    enc s = B.pack $ decodeStrictByteString CP1251 s
+
