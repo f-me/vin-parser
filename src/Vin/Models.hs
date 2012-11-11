@@ -228,7 +228,7 @@ vwMotor = withModel vwModel (<:: column (encodeString "Модель") vwModelVal
 			maybe failed return $ listToMaybe $ mapMaybe fromTransmission $ C8.words c
 
 vwCommercial :: Dict Model
-vwCommercial = withModel vwModel (<:: ((encodeString . mheads . words . decodeString) <$> ("модель" `typed` byteString))) "vwCommercial" [
+vwCommercial = withModel vwModel (<:: ((encodeString . mheads . words . decodeString) <$> ("модель" `typed` byteString))) "vwcargo" [
 	carMaker <:= "vw",
 	sellDate <: "Дата продажи",
 	validUntil <: "Дата окончания карты",
