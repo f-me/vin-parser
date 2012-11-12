@@ -72,7 +72,7 @@ type Dict a = Reader CarDictionaries a
 cars :: String -> Dict (ModelField ByteString)
 cars s = do
 	cars' <- asks ((`getCarsReverseMap` s) . modelsDict)
-	return ("model" ~:: table cars')
+	return ("model" ~:: tableLowCase cars')
 
 -- | Gets model-value by make-label and model-label
 allCars :: Dict (M.Map ByteString (M.Map ByteString ByteString))
@@ -91,7 +91,7 @@ carsList s = do
 makersTable :: Dict (ModelField ByteString)
 makersTable = do
 	mk' <- asks (getMakers . makersDict)
-	return ("make" ~:: table mk')
+	return ("make" ~:: tableLowCase mk')
 
 programsList :: Dict [String]
 programsList = asks (getPrograms . programsDict)
@@ -99,7 +99,7 @@ programsList = asks (getPrograms . programsDict)
 colorsTable :: Dict (ModelField ByteString)
 colorsTable = do
 	c' <- asks (getColors . colorsDict)
-	return ("color" ~:: table c')
+	return ("color" ~:: tableLowCase c')
 
 -- | Run with dictionary
 runWithDicts :: FilePath -> FilePath -> FilePath -> FilePath -> Dict a -> IO (Maybe a)
@@ -146,7 +146,7 @@ withModel m onModel p fs = do
 
 ford :: Dict Model
 ford = withModel fordModel (<: "MODEL") "ford" [
-	carMaker <:= "Ford",
+	carMaker <:= "ford",
 	-- fddsId <: "FDDS_ID",
 	companyCode <: "DEALER_CODE",
 	companyLATName <: "DEALER_NAME",

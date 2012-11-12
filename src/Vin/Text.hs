@@ -106,6 +106,14 @@ table t = FieldType id $ do
         Nothing -> throwError $ strMsg $ "Can't find value " ++ s ++ " in table"
         Just v -> return v
 
+-- | Value from table (low-casing key)
+tableLowCase :: M.Map ByteString ByteString -> FieldType ByteString
+tableLowCase t = FieldType id $ do
+    s <- fieldReader string
+    case M.lookup (encodeString $ map toLower s) t of
+        Nothing -> throwError $ strMsg $ "Can't find value " ++ s ++ " in table"
+        Just v -> return v
+
 -- | Value from table through ByteString
 tableByte :: M.Map ByteString ByteString -> FieldType ByteString
 tableByte t = FieldType id $ do
@@ -171,14 +179,14 @@ time = FieldType showTime times where
     times = do
         s <- fieldReader string
         alt ("Can't parse time: " ++ s) $ dublin : map posix [
-            "%m/%d/%Y",
-            "%m/%e/%Y",
-            "%m/%e/%Y %k:%M",
+            "%d/%m/%Y",
+            "%e/%m/%Y",
+            "%e/%m/%Y %k:%M",
             "%d.%m.%Y",
             "%e %b %Y",
             "%e-%b-%Y",
             "%d-%b-%y",
-            "%m-%d-%y",
+            "%d-%m-%y",
             "%b %Y",
             "%Y-%m-%dT%H:%M:%S",
             "%d.%m.%Y %H:%M:%S"]
