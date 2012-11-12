@@ -7,7 +7,7 @@ module Vin.Text (
     TypeError(..),
     decodeString, encodeString, withString,
     byteString, upperByteString, string, upperString, int, intByte,
-    table, tableByte, (<<~), oneOf, oneOfByte, oneOfNoCase, oneOfNoCaseByte, oneOfBy, oneOfByByte,
+    table, tableLowCase, tableByte, (<<~), oneOf, oneOfByte, oneOfNoCase, oneOfNoCaseByte, oneOfBy, oneOfByByte,
     alt, optional, withDefault,
     time, phone, email,
 
