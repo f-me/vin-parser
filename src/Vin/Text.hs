@@ -110,7 +110,7 @@ table t = FieldType id $ do
 tableLowCase :: M.Map ByteString ByteString -> FieldType ByteString
 tableLowCase t = FieldType id $ do
     s <- fieldReader string
-    case M.lookup (encodeString $ map toLower s) t of
+    case M.lookup (encodeString $ map toLower s) (M.mapKeys (encodeString . map toLower . decodeString) t) of
         Nothing -> throwError $ strMsg $ "Can't find value " ++ s ++ " in table"
         Just v -> return v
 
