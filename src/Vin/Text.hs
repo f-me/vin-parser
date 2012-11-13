@@ -25,6 +25,8 @@ import Data.Char (toUpper, isSpace, toLower, isDigit)
 import Data.Function
 
 import Data.List (intercalate, find)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Data.Map as M
 
 import Data.Time.Clock.POSIX
@@ -55,7 +57,7 @@ instance Error TypeError where
 -- | Trimmed ByteString
 byteString :: FieldType ByteString
 byteString = FieldType id (trim <$> field) where
-    trim = snd . C8.span isSpace . fst . C8.spanEnd isSpace
+    trim = T.encodeUtf8 . T.dropAround isSpace . T.decodeUtf8
 
 -- | Trimmed uppercased ByteString
 upperByteString :: FieldType ByteString
