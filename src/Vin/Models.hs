@@ -394,7 +394,6 @@ universal = do
 		checkModel = verifyType (not . C8.null) "Invalid car model" byteString
 	return $ \p -> model' p [
 		vin <: "VIN",
-		callTaker <: "Сотрудник РАМК",
 		("owner_name" ~:: byteString) <: "ФИО владельца",
 		("owner_phone1" ~:: byteString) <: "Контактный телефон владельца",
 		("owner_email" ~:: email) <: "Email владельца",
