@@ -26,6 +26,7 @@ import           Control.Monad.CatchIO (finally, catch)
 import           Control.Monad.State
 import           Data.Aeson
 import           Data.Lens.Template
+import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -202,23 +203,25 @@ uploadData program f = do
                     ", rows uploaded: ",
                     T.pack $ show valid]
 
-    liftIO $ forkIO $ do
-        loadFile fUploaded fError fLog (T.encodeUtf8 . T.pack $ program) (extension $ takeExtension fUploaded) uploadStats
-        `E.catches` [
-            E.Handler (\(ex :: VinUploadException) -> return ()),
-            E.Handler (\(ex :: E.SomeException) -> return ())]
-        `finally` (do
+        endWith :: Maybe T.Text -> IO ()
+        endWith result = do
             (total, valid) <- readMVar statsVar
             let
-                resultMessage = T.concat [
-                    "Done. Total rows processed: ",
+                statsMsg = T.concat [
+                    "Total rows processed: ",
                     T.pack $ show total,
                     ", rows uploaded: ",
                     T.pack $ show valid]
-                doneAlert = alertUpdate s $ (successAlert (T.pack f) resultMessage (T.pack f)
-                    `withErrorFile` fErrorLink
-                    `withErrorLogFile` fLogLink)
-            doneAlert)
+                resultMsg = T.concat [
+                    maybe "Done. " (\err -> T.concat ["Failed with: ", err, ". "]) result,
+                    statsMsg]
+            alertUpdate s $ (if isJust result then errorAlert else successAlert) (T.pack f) resultMsg (T.pack f)
+
+    liftIO $ forkIO
+        $ (loadFile fUploaded fError fLog (T.encodeUtf8 . T.pack $ program) (extension $ takeExtension fUploaded) uploadStats >> endWith Nothing)
+        `E.catches` [
+            E.Handler (\(VinUploadException r _) -> endWith (Just r)),
+            E.Handler (\(ex :: E.SomeException) -> endWith (Just $ fromString $ show ex))]
 
     writeBS "Ok"
     where

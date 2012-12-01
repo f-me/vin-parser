@@ -24,6 +24,7 @@ import Data.Char (isSpace)
 import Data.List (intercalate)
 import qualified Data.Map as M
 import Data.Text as T (Text)
+import Data.String
 import Data.Typeable
 
 import Database.Redis as R
@@ -65,6 +66,14 @@ parseRow m r = case parse m r of
     Left e -> Left (r, e)
     Right s -> Right $ M.fromList $ zip (map fst (modelFields m)) s
 
+parseRowIO :: Model -> DataRow -> IO (Either ParseError DataRow)
+parseRowIO m r = catch (evaluate res) onError where
+    res = case parse m r of
+        Left e -> Left (r, e)
+        Right s -> Right $ M.fromList $ zip (map fst (modelFields m)) s
+    onError :: SomeException -> IO (Either ParseError DataRow)
+    onError e = return $ Left (r, [NoColumn $ fromString $ show e])
+
 trimKeys :: DataRow -> DataRow
 trimKeys = M.mapKeys trim where
     trim = fst . C8.spanEnd isSpace . snd . C8.span isSpace
@@ -79,7 +88,7 @@ sinkXFile
     -> Sink DataRow m ()
 sinkXFile store fError fLog stats ml
     =   CL.map trimKeys
-    =$ CL.map (parseRow ml)
+    =$ CL.mapM (liftIO . parseRowIO ml)
     =$ storeCorrect ml store stats
     =$ storeErrorLog fLog
     =$ CL.map encodeCP1251
@@ -90,19 +99,18 @@ storeCorrect
     => Model
     -> (R.Connection -> DataRow -> IO ())
     -> (Int -> Int -> IO ())
-    -> Conduit (Either a DataRow) m a
+    -> Conduit (Either ParseError DataRow) m ParseError
 
 storeCorrect _ store stats = conduitIO
     ((,) <$> R.connect R.defaultConnectInfo <*> newMVar (0, 0))
     (\(conn, _) -> runRedis conn quit >> return ())
     (\(conn, statsVar) r -> case r of
-        Right r' -> do
-            liftIO $ do
-                store conn r'
-                newUpload statsVar
-            return $ IOProducing []
-        Left r' -> do
-            liftIO $ newFail statsVar
+        Right r' -> liftIO $ do
+            store conn r'
+            newUpload statsVar
+            return (IOProducing [])
+        Left r' -> liftIO $ do
+            newFail statsVar
             return $ IOProducing [r'])
     (const $ return [])
     where
