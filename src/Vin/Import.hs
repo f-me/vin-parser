@@ -11,7 +11,6 @@ import Control.Exception (throw)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import Data.Conduit
-import Data.List (find)
 import qualified Data.Map as M
 
 import qualified Data.Text as T (pack)

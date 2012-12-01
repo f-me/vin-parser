@@ -9,15 +9,11 @@ module Snap.Snaplet.Vin
     , initUploadState, uploadData, getState, removeAlert
     ) where
 
-import           Prelude hiding (catch)
 import           Control.Applicative
 import           Control.Concurrent
-import Control.Concurrent.MVar
 import qualified Control.Exception as E
 import           Control.Monad.IO.Class
 import           Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as B
-import           Data.Map (Map)
 import           Data.Map as M
 import           Data.Maybe
 import           GHC.Generics
@@ -35,7 +31,6 @@ import           Snap.Snaplet
 import           Snap.Util.FileUploads
 import           System.FilePath
 import           System.Directory
-import           System.Posix.Files (createLink, removeLink)
 
 import           Vin.Import
 

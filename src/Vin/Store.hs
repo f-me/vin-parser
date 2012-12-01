@@ -24,7 +24,6 @@ import Data.Char (isSpace)
 import Data.List (intercalate)
 import qualified Data.Map as M
 import Data.Text as T (Text)
-import Data.String
 import Data.Typeable
 
 import Database.Redis as R
@@ -35,6 +34,7 @@ import Vin.Text (TypeError(..))
 import Vin.Text.String
 import Vin.Row
 import Vin.Model
+import Vin.Load
 import Vin.Utils
 
 data VinUploadException = VinUploadException {
@@ -61,18 +61,15 @@ redisSetWithKey' key val = do
 
 type ParseError = (DataRow, [RowError ByteString TypeError])
 
-parseRow :: Model -> DataRow -> Either ParseError DataRow
+parseRow :: Model -> DataRow -> Either String DataRow
 parseRow m r = case parse m r of
-    Left e -> Left (r, e)
+    Left es -> Left $ formatErrors es
     Right s -> Right $ M.fromList $ zip (map fst (modelFields m)) s
-
-parseRowIO :: Model -> DataRow -> IO (Either ParseError DataRow)
-parseRowIO m r = catch (evaluate res) onError where
-    res = case parse m r of
-        Left e -> Left (r, e)
-        Right s -> Right $ M.fromList $ zip (map fst (modelFields m)) s
-    onError :: SomeException -> IO (Either ParseError DataRow)
-    onError e = return $ Left (r, [NoColumn $ fromString $ show e])
+    where
+        formatErrors ers = intercalate "; " $ map formatError ers
+        formatError (NoColumn name) = "No field " ++ decodeString name
+        formatError (FieldError name (InvalidType msg)) =
+            "Invalid field " ++ decodeString name ++ ": " ++ msg
 
 trimKeys :: DataRow -> DataRow
 trimKeys = M.mapKeys trim where
@@ -85,13 +82,12 @@ sinkXFile
     -> FilePath
     -> (Int -> Int -> IO ())
     -> Model
-    -> Sink DataRow m ()
+    -> Sink DataRowError m ()
 sinkXFile store fError fLog stats ml
-    =   CL.map trimKeys
-    =$ CL.mapM (liftIO . parseRowIO ml)
+    =   safeMap trimKeys
+    =$ safeMapM (parseRow ml)
     =$ storeCorrect ml store stats
     =$ storeErrorLog fLog
-    =$ CL.map encodeCP1251
     =$ writeIncorrect fError
 
 storeCorrect
@@ -99,19 +95,19 @@ storeCorrect
     => Model
     -> (R.Connection -> DataRow -> IO ())
     -> (Int -> Int -> IO ())
-    -> Conduit (Either ParseError DataRow) m ParseError
+    -> Conduit DataRowError m (DataRow, String)
 
 storeCorrect _ store stats = conduitIO
     ((,) <$> R.connect R.defaultConnectInfo <*> newMVar (0, 0))
     (\(conn, _) -> runRedis conn quit >> return ())
-    (\(conn, statsVar) r -> case r of
+    (\(conn, statsVar) (src, r) -> case r of
         Right r' -> liftIO $ do
             store conn r'
             newUpload statsVar
             return (IOProducing [])
-        Left r' -> liftIO $ do
+        Left e' -> liftIO $ do
             newFail statsVar
-            return $ IOProducing [r'])
+            return $ IOProducing [(src, e')])
     (const $ return [])
     where
         updateStats m = readMVar m >>= uncurry stats
@@ -121,19 +117,14 @@ storeCorrect _ store stats = conduitIO
 storeErrorLog
     :: MonadResource m
     => FilePath
-    -> Conduit ParseError m DataRow
+    -> Conduit (DataRow, String) m DataRow
 storeErrorLog fLog = conduitIO
     (IO.openFile fLog IO.WriteMode)
     IO.hClose
-    (\h (r, ers) -> do
-        liftIO $ IO.hPutStrLn h $ formatErrors ers
+    (\h (r, err) -> do
+        liftIO $ IO.hPutStrLn h err
         return $ IOProducing [r])
     (const $ return [])
-    where
-        formatErrors ers = intercalate "; " $ map formatError ers
-        formatError (NoColumn name) = "No field " ++ decodeString name
-        formatError (FieldError name (InvalidType msg)) =
-            "Invalid field " ++ decodeString name ++ ": " ++ msg
 
 writeIncorrect :: MonadResource m => FilePath -> Sink DataRow m ()
 writeIncorrect fp = do
