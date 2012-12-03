@@ -211,11 +211,13 @@ uploadData program f = do
                     maybe "Done. " (\err -> T.concat ["Failed with: ", err, ". "]) result,
                     statsMsg]
             alertUpdate s $ (if isJust result then errorAlert else successAlert) (T.pack f) resultMsg (T.pack f)
+                `withErrorFile` fErrorLink
+                `withErrorLogFile` fLogLink
 
     liftIO $ forkIO
         $ (loadFile fUploaded fError fLog (T.encodeUtf8 . T.pack $ program) (extension $ takeExtension fUploaded) uploadStats >> endWith Nothing)
         `E.catches` [
-            E.Handler (\(VinUploadException r _) -> endWith (Just r)),
+            E.Handler (\(ex :: VinUploadException) -> endWith Nothing),
             E.Handler (\(ex :: E.SomeException) -> endWith (Just $ fromString $ show ex))]
 
     writeBS "Ok"
