@@ -251,7 +251,7 @@ opel = withModel opelModel (<: "Model") "opel" [
 	sellDate <: "Retail Date"]
 
 hummer :: Dict Model
-hummer = withModel hummerModel (<:: (dropHummer <$> ("Model" `typed` byteString))) "hummer" [
+hummer = withModel hummerModel (<:: (dropHummer <$> ("Model" `typed` byteString))) "hum" [
 	seller <: "Retail Dealer",
 	sellDate <: "Retail Date",
 	carMaker <:= "hum",
@@ -261,7 +261,7 @@ hummer = withModel hummerModel (<:: (dropHummer <$> ("Model" `typed` byteString)
 		dropHummer = C8.concat . take 1 . drop 1 . C8.words
 
 chevroletNAO :: Dict Model
-chevroletNAO = withModel chevroletModel (<: "Model") "chevroletNAO" [
+chevroletNAO = withModel chevroletModel (<: "Model") "chevyna" [
 	seller <: "Retail Dealer",
 	sellDate <: "Retail Date",
 	carMaker <:= "chevy",
@@ -269,7 +269,7 @@ chevroletNAO = withModel chevroletModel (<: "Model") "chevroletNAO" [
 	previousVin <: "VIN"]
 
 chevroletKorea :: Dict Model
-chevroletKorea = withModel chevroletModel onModel "chevroletKorea" [
+chevroletKorea = withModel chevroletModel onModel "chevyko" [
 	carMaker <:= "chevy",
 	vin <: "VIN",
 	seller <: "Retail Dealer",
@@ -279,7 +279,7 @@ chevroletKorea = withModel chevroletModel onModel "chevroletKorea" [
 		onModel = (<:: ((encodeString . mheads . words . decodeString) <$> ("Model" `typed` byteString)))
 
 cadillac :: Dict Model
-cadillac = withModel cadillacModel onModel "cadillac" [
+cadillac = withModel cadillacModel onModel "cadold" [
 	seller <: "Retail Dealer",
 	sellDate <: "Retail Date",
 	carMaker <:= "cad",
@@ -290,7 +290,7 @@ cadillac = withModel cadillacModel onModel "cadillac" [
 		onModel = (<:: (dropCadillac <$> ("Model" `typed` byteString)))
 
 vwRuslan :: Dict Model
-vwRuslan = withModel vwModel onModel "vwRuslan" [
+vwRuslan = withModel vwModel onModel "ruslan" [
 	cardNumber <: "№",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
 	carMaker <:= "vw",
@@ -314,7 +314,7 @@ chartis = withModel chartisModel (<:: capitalized "Модель Автомоби
 	validUntil <: "Программа действует до (Дата)"]
 
 vwAvilon :: Dict Model
-vwAvilon = withModel vwModel (<: "Модель Автомобиля VW") "vwAvilon" [
+vwAvilon = withModel vwModel (<: "Модель Автомобиля VW") "avilon" [
 	carMaker <:= "vw",
 	cardNumber <: "Подрядковый номер клубной карты",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
@@ -348,7 +348,7 @@ autocraft = withModel bmwModel (<: "Модель Автомобиля BMW") "aut
 	milageTO <: "Величина пробега на момент регистрации в Программе"]
 
 europlan :: Dict Model
-europlan = withModel europlanModel (<: "Модель автомобиля") "europlan" [
+europlan = withModel europlanModel (<: "Модель автомобиля") "euro" [
 	carMaker <: "Марка автомобиля",
 	cardNumber <: "Подрядковый номер клубной карты",
 	makeYear <: "Год выпуска автомобиля",
