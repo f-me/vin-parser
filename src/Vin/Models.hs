@@ -164,7 +164,7 @@ fordPlus :: Dict Model
 fordPlus = withModel fordModel (<: "Модель") "fordPlus" [
 	companyCode <: "UR",
 	vin <: "VIN",
-	-- carMaker <: "carMake",
+	carMaker <:= "ford",
 	sellDate <: "Дата первой продажи",
 	lastTODate <: "Дата прохождения ТО",
 	milageTO <: "Пробег на момент прохождения ТО"]
@@ -244,7 +244,7 @@ vwCommercial = withModel vwModel (<:: ((encodeString . mheads . words . decodeSt
 
 opel :: Dict Model
 opel = withModel opelModel (<: "Model") "opel" [
-	carMaker <:: (("carMake" `typed` byteString) <|> pure (encodeString "Opel")),
+	carMaker <:= "opel",
 	vin <:: (("VIN" `typed` modelFieldType vin) <|> ("Previous VIN (SKD)" `typed` modelFieldType vin)),
 	carMaker <:: (("Brand" `typed` byteString) <|> pure (encodeString "Opel")),
 	seller <: "Retail Dealer",
@@ -254,7 +254,7 @@ hummer :: Dict Model
 hummer = withModel hummerModel (<:: (dropHummer <$> ("Model" `typed` byteString))) "hummer" [
 	seller <: "Retail Dealer",
 	sellDate <: "Retail Date",
-	carMaker <:"Brand",
+	carMaker <:= "hum",
 	vin <: "VIN RUS",
 	previousVin <: "VIN"]
 	where
@@ -264,13 +264,13 @@ chevroletNAO :: Dict Model
 chevroletNAO = withModel chevroletModel (<: "Model") "chevroletNAO" [
 	seller <: "Retail Dealer",
 	sellDate <: "Retail Date",
-	carMaker <: "Brand",
+	carMaker <:= "chevy",
 	vin <: "VIN RUS",
 	previousVin <: "VIN"]
 
 chevroletKorea :: Dict Model
 chevroletKorea = withModel chevroletModel onModel "chevroletKorea" [
-	carMaker <:: (("Brand" `typed` carModels) <|> pure (encodeString "")),
+	carMaker <:= "chevy",
 	vin <: "VIN",
 	seller <: "Retail Dealer",
 	-- previousVin <: "Previous VIN (SKD)",
@@ -282,7 +282,7 @@ cadillac :: Dict Model
 cadillac = withModel cadillacModel onModel "cadillac" [
 	seller <: "Retail Dealer",
 	sellDate <: "Retail Date",
-	carMaker <: "Brand",
+	carMaker <:= "cad",
 	vin <: "VIN RUS",
 	previousVin <: "VIN"]
 	where
@@ -338,7 +338,7 @@ atlantM = withModel vwModel (<: "Модель Автомобиля VW") "atlant"
 
 autocraft :: Dict Model
 autocraft = withModel bmwModel (<: "Модель Автомобиля BMW") "autocraft" [
-	carMaker <:= "BMW",
+	carMaker <:= "bmw",
 	cardNumber <: "Подрядковый номер клубной карты",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
 	ownerName <: "ФИО Клиента",
