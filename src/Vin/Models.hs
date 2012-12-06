@@ -72,7 +72,7 @@ type Dict a = Reader CarDictionaries a
 cars :: String -> Dict (ModelField ByteString)
 cars s = do
 	cars' <- asks ((`getCarsReverseMap` s) . modelsDict)
-	return ("model" ~:: tableLowCase cars')
+	return ("car_model" ~:: tableLowCase cars')
 
 -- | Gets model-value by make-label and model-label
 allCars :: Dict (M.Map ByteString (M.Map ByteString ByteString))
@@ -86,12 +86,12 @@ allCars = do
 carsList :: String -> Dict (ModelField ByteString)
 carsList s = do
 	cars' <- asks ((`getCars` s) . modelsDict)
-	return ("model" ~:: oneOfNoCaseByte cars')
+	return ("car_model" ~:: oneOfNoCaseByte cars')
 
 makersTable :: Dict (ModelField ByteString)
 makersTable = do
 	mk' <- asks (getMakers . makersDict)
-	return ("make" ~:: tableLowCase mk')
+	return ("car_make" ~:: tableLowCase mk')
 
 programsList :: Dict [String]
 programsList = asks (getPrograms . programsDict)
@@ -99,7 +99,7 @@ programsList = asks (getPrograms . programsDict)
 colorsTable :: Dict (ModelField ByteString)
 colorsTable = do
 	c' <- asks (getColors . colorsDict)
-	return ("color" ~:: tableLowCase c')
+	return ("car_color" ~:: tableLowCase c')
 
 -- | Run with dictionary
 runWithDicts :: FilePath -> FilePath -> FilePath -> FilePath -> Dict a -> IO (Maybe a)
@@ -147,27 +147,19 @@ withModel m onModel p fs = do
 ford :: Dict Model
 ford = withModel fordModel (<: "MODEL") "ford" [
 	carMaker <:= "ford",
-	-- fddsId <: "FDDS_ID",
-	companyCode <: "DEALER_CODE",
-	companyLATName <: "DEALER_NAME",
+	seller <: "DEALER_NAME",
 	checkupDate <: "VALID_FROM",
 	vin <: "VIN_NUMBER",
-	--carMake               "carMake",
-	-- arcModelCode <: "ARC_MODEL_CODE",
-	sellDate <: "FIRST_REGISTRATION_DATE",
-	-- fordVehicleType <: "VEHICLE_TYPE",
-	-- fordCountryFirstSold <: "COUNTRY_FIRST_SOLD",
-	programRegistrationDate <: "CREATION_DATE",
+	buyDate <: "FIRST_REGISTRATION_DATE",
 	milageTO <: "MILEAGE"]
 
 fordPlus :: Dict Model
 fordPlus = withModel fordModel (<: "Модель") "fordPlus" [
-	companyCode <: "UR",
 	vin <: "VIN",
 	carMaker <:= "ford",
-	sellDate <: "Дата первой продажи",
-	lastTODate <: "Дата прохождения ТО",
-	milageTO <: "Пробег на момент прохождения ТО"]
+	buyDate <: "Дата первой продажи",
+	checkupDate <: "Дата прохождения ТО",
+	checkupMileage <: "Пробег на момент прохождения ТО"]
 
 data MotorModel = MotorModel {
 	motorModelName :: String,
@@ -185,13 +177,9 @@ vwMotor = withModel vwModel (<:: column (encodeString "Модель") vwModelVal
 	carTransmission <:: column (encodeString "Модель") vwTransmission,
 	makeYear <: "Модельный год",
 	vin <: "VIN",
-	dealerCode <: "Код дилера получателя",
-	companyName <: "Дилер получатель",
-	contractNo <: "No Дог продажи Клиенту",
+	seller <: "Дилер получатель",
 	buyDate <: "Дата договора продажи",
-	ownerCompany <: "Компания покупатель",
-	ownerContact <: "Контактное лицо покупателя",
-	ownerName <: "Фактический получатель ам"]
+	ownerName <: "Контактное лицо покупателя"]
 	where
 		vwColor :: TextField ByteString
 		vwColor = do
@@ -230,17 +218,15 @@ vwMotor = withModel vwModel (<:: column (encodeString "Модель") vwModelVal
 vwCommercial :: Dict Model
 vwCommercial = withModel vwModel (<:: ((encodeString . mheads . words . decodeString) <$> ("модель" `typed` byteString))) "vwcargo" [
 	carMaker <:= "vw",
-	sellDate <: "Дата продажи",
+	buyDate <: "Дата продажи",
 	validUntil <: "Дата окончания карты",
-	companyName <: "Продавец",
+	seller <: "Продавец",
 	cardNumber <: "№ карты",
 	vin <: "VIN",
 	makeYear <: "модельный год",
-	plateNumber <: "госномер",
+	plateNum <: "госномер",
 	ownerName <:: wordsF ["имя", "фамилия", "отчество"],
-	ownerAddress <:: wordsF ["адрес частного лица или организации", "город", "индекс"],
-	ownerPhone <:: wordsF ["тел1", "тел2"],
-	ownerCompany <: "название организации"]
+	ownerPhone <:: wordsF ["тел1", "тел2"]]
 
 opel :: Dict Model
 opel = withModel opelModel (<: "Model") "opel" [
@@ -248,43 +234,39 @@ opel = withModel opelModel (<: "Model") "opel" [
 	vin <:: (("VIN" `typed` modelFieldType vin) <|> ("Previous VIN (SKD)" `typed` modelFieldType vin)),
 	carMaker <:: (("Brand" `typed` byteString) <|> pure (encodeString "Opel")),
 	seller <: "Retail Dealer",
-	sellDate <: "Retail Date"]
+	buyDate <: "Retail Date"]
 
 hummer :: Dict Model
 hummer = withModel hummerModel (<:: (dropHummer <$> ("Model" `typed` byteString))) "hum" [
 	seller <: "Retail Dealer",
-	sellDate <: "Retail Date",
+	buyDate <: "Retail Date",
 	carMaker <:= "hum",
-	vin <: "VIN RUS",
-	previousVin <: "VIN"]
+	vin <: "VIN RUS"]
 	where
 		dropHummer = C8.concat . take 1 . drop 1 . C8.words
 
 chevroletNAO :: Dict Model
 chevroletNAO = withModel chevroletModel (<: "Model") "chevyna" [
 	seller <: "Retail Dealer",
-	sellDate <: "Retail Date",
+	buyDate <: "Retail Date",
 	carMaker <:= "chevy",
-	vin <: "VIN RUS",
-	previousVin <: "VIN"]
+	vin <: "VIN RUS"]
 
 chevroletKorea :: Dict Model
 chevroletKorea = withModel chevroletModel onModel "chevyko" [
 	carMaker <:= "chevy",
 	vin <: "VIN",
 	seller <: "Retail Dealer",
-	-- previousVin <: "Previous VIN (SKD)",
-	sellDate <: "Retail Date"]
+	buyDate <: "Retail Date"]
 	where
 		onModel = (<:: ((encodeString . mheads . words . decodeString) <$> ("Model" `typed` byteString)))
 
 cadillac :: Dict Model
 cadillac = withModel cadillacModel onModel "cadold" [
 	seller <: "Retail Dealer",
-	sellDate <: "Retail Date",
+	buyDate <: "Retail Date",
 	carMaker <:= "cad",
-	vin <: "VIN RUS",
-	previousVin <: "VIN"]
+	vin <: "VIN RUS"]
 	where
 		dropCadillac = C8.concat . take 1 . drop 1 . C8.words
 		onModel = (<:: (dropCadillac <$> ("Model" `typed` byteString)))
@@ -296,7 +278,7 @@ vwRuslan = withModel vwModel onModel "ruslan" [
 	carMaker <:= "vw",
 	vin <: "VIN номер Автомобиля VW",
 	serviceInterval <: "Межсервисный интервал",
-	lastTODate <: "Дата прохождения ТО (Дата регистрации в программе)",
+	validFrom <: "Дата прохождения ТО (Дата регистрации в программе)",
 	milageTO <: "Величина пробега на момент регистрации в Программе",
 	validUntil <: "Программа действует до (Дата)",
 	validUntilMilage <: "Программа действует до (Пробега)"]
@@ -366,20 +348,12 @@ b2c = withModel b2cModel (<: "Модель автомобиля") "b2c" [
 	cardNumber <: "Номер карты",
 	programName <: "Тип карты",
 	ownerName <:: wordsF ["Фамилия клиента", "Имя клиента", "Отчество клиента"],
-	ownerLATName <:: wordsF ["Фамилия клиента (Лат)", "Имя клиента (Лат)"],
-	ownerAddress <:: wordsF [
-		"Адрес места жительства Индекс",
-		"Адрес места жительства Город",
-		"Адрес места жительства Улица",
-		"Адрес места жительства Дом",
-		"Адрес места жительства Квартира"],
 	ownerPhone <:: wordsF ["Телефон клиента Мобильный", "Телефон клиента Домашний"],
 	ownerEmail <: "Е-МAIL клиента",
 	carMaker <:: capitalized "Марка автомобиля",
 	makeYear <: "Год выпуска",
-	plateNumber <: "Гос номер",
-	vin <: "Идентификационный номер (VIN)",
-	ownerContact <:: wordsF ["Фамилия доверенного лица", "Имя доверенного лица", "Отчество доверенного лица"]]
+	plateNum <: "Гос номер",
+	vin <: "Идентификационный номер (VIN)"]
 
 universal :: Dict (String -> Model)
 universal = do
@@ -394,12 +368,12 @@ universal = do
 		checkModel = verifyType (not . C8.null) "Invalid car model" byteString
 	return $ \p -> model' p [
 		vin <: "VIN",
-		("owner_name" ~:: byteString) <: "ФИО владельца",
-		("owner_phone1" ~:: byteString) <: "Контактный телефон владельца",
-		("owner_email" ~:: email) <: "Email владельца",
+		ownerName <: "ФИО владельца",
+		ownerPhone <: "Контактный телефон владельца",
+		ownerEmail <: "Email владельца",
 		fmake <: "Марка",
-		("model" ~:: checkModel) <:: (lookupModel <$> ("Марка" `typed` byteString) <*> ("Модель" `typed` byteString)),
-		plateNumber <: "Госномер",
+		("car_model" ~:: checkModel) <:: (lookupModel <$> ("Марка" `typed` byteString) <*> ("Модель" `typed` byteString)),
+		plateNum <: "Госномер",
 		makeYear <: "Год производства автомобиля",
 		col <: "Цвет",
 		buyDate <: "Дата покупки",
@@ -410,7 +384,7 @@ universal = do
 		validUntilMilage <: "Программа действует до (пробег)",
 		milageTO <: "Пробег при регистрации в программе",
 		serviceInterval <: "Межсервисный интервал",
-		("cardOwner" ~:: byteString) <: "ФИО владельца карты",
+		cardOwner <: "ФИО владельца карты",
 		manager <: "ФИО менеджера"]
 
 models :: Dict (String -> Maybe Model)
@@ -466,48 +440,33 @@ vwModel = cars "vw"
 fordModel = cars "ford"
 bmwModel = cars "bmw"
 hummerModel = cars "hum"
-europlanModel = return ("model" ~:: byteString)
-b2cModel = return ("model" ~:: byteString)
-chartisModel = return ("model" ~:: byteString)
+europlanModel = return carModel
+b2cModel = return carModel
+chartisModel = return carModel
 
 arcModelCode             = "modelCode"                      ~:: byteString
-buyDate                  = "buyDate"                        ~:: time
-callTaker                 = "callTaker"                      ~:: byteString
-carMaker                 = "make"                           ~:: carMakers
-carModel                 = "model"                          ~:: carModels
-carMotor                 = "motor"                          ~:: byteString
-carTransmission          = "transmission"                   ~:: byteString
-cardNumber               = "cardNumber"                     ~:: byteString
-checkupDate              = "checkupDate"                    ~:: time
-color                    = "color"                          ~:: byteString
-companyCode              = "companyCode"                    ~:: byteString
-companyLATName           = "companyLATName"                 ~:: byteString
-companyName              = "companyName"                    ~:: byteString
-contractDate             = "contractDate"                   ~:: time
-contractNo               = "contractNo"                     ~:: byteString
-dealerCode               = "dealerCode"                     ~:: byteString
-dealerName               = "dealerName"                     ~:: byteString
-fddsId                   = "fddsId"                         ~:: byteString
-lastTODate               = "checkupDate"                    ~:: time
-manager                  = "manager"                        ~:: byteString
-milageTO                 = "milageTO"                       ~:: byteString
-makeYear                = "makeYear"                      ~:: int
-ownerAddress             = "ownerAddress"                   ~:: byteString
-ownerCompany             = "ownerCompany"                   ~:: byteString
-ownerContact             = "ownerContact"                   ~:: byteString
-ownerEmail               = "ownerEmail"                     ~:: email
-ownerLATName             = "ownerLATName"                   ~:: byteString
-ownerName                = "ownerName"                      ~:: byteString
-ownerPhone               = "ownerPhone"                     ~:: phone
-plateNumber              = "plateNum"                       ~:: byteString
-previousVin              = "vin2"                           ~:: upperByteString
-programName              = "program"                        ~:: byteString
-programRegistrationDate  = "programRegistrationDate"        ~:: time
-sellDate                 = "buyDate"                        ~:: time
-seller                   = "seller"                         ~:: byteString
-serviceInterval          = "serviceInterval"                ~:: int
-subProgramName           = "subProgramName"                 ~:: byteString
-validFrom                = "validFrom"                      ~:: time
-validUntil               = "validUntil"                     ~:: time
-validUntilMilage         = "validUntilMilage"               ~:: int
-vin                      = "vin"                            ~:: notNull upperByteString
+buyDate                  = "car_buyDate"                        ~:: time
+carMaker                 = "car_make"                           ~:: carMakers
+carModel                 = "car_model"                          ~:: byteString
+carMotor                 = "car_motor"                          ~:: byteString
+carTransmission          = "car_transmission"                   ~:: byteString
+cardNumber               = "cardNumber_cardNumber"                     ~:: byteString
+cardOwner                  = "cardNumber_cardOwner"                    ~:: byteString
+checkupDate              = "car_checkupDate"                    ~:: time
+checkupMileage              = "car_checkupMileage"                    ~:: int
+color                    = "car_color"                          ~:: byteString
+lastTODate               = "car_checkupDate"                    ~:: time
+manager                  = "cardNumber_manager"                        ~:: byteString
+milageTO                 = "cardNumber_milageTO"                       ~:: byteString
+makeYear                = "car_makeYear"                      ~:: int
+ownerEmail               = "contact_ownerEmail"                     ~:: email
+ownerName                = "contact_ownerName"                      ~:: byteString
+ownerPhone               = "contact_ownerPhone1"                     ~:: phone
+plateNum              = "car_plateNum"                       ~:: byteString
+programName              = "program"                       ~:: byteString
+seller                   = "car_seller"                         ~:: byteString
+serviceInterval          = "cardNumber_serviceInterval"                ~:: int
+validFrom                = "cardNumber_validFrom"                      ~:: time
+validUntil               = "cardNumber_validUntil"                     ~:: time
+validUntilMilage         = "cardNumber_validUntilMilage"               ~:: int
+vin                      = "car_vin"                            ~:: notNull upperByteString
