@@ -2,7 +2,7 @@
 
 -- | Module with model definitions
 module Vin.Models (
-	runWithDicts, runDict,
+    runWithDicts, runDict,
     models
     ) where
 
