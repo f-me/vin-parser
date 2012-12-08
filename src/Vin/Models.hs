@@ -151,7 +151,7 @@ ford = withModel fordModel (<: "MODEL") "ford" [
 	checkupDate <: "VALID_FROM",
 	vin <: "VIN_NUMBER",
 	buyDate <: "FIRST_REGISTRATION_DATE",
-	milageTO <: "MILEAGE"]
+	checkupMileage <: "MILEAGE"]
 
 fordPlus :: Dict Model
 fordPlus = withModel fordModel (<: "Модель") "fordPlus" [
