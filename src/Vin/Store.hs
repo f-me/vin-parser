@@ -49,7 +49,7 @@ redisSetVin c val = runRedis c sets where
     sets = mapM_ (\k -> redisSetWithKey' (key k) val) vins
     -- It seems that car can have several keys
     -- Duplicate as temporary solution
-    vins = C8.words $ val M.! "vin"
+    vins = C8.words $ val M.! "car_vin"
     key k = C8.concat ["vin:", k]
 
 redisSetWithKey' :: ByteString -> DataRow -> Redis ()
