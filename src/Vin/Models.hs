@@ -444,6 +444,28 @@ europlanModel = return carModel
 b2cModel = return carModel
 chartisModel = return carModel
 
+-- VIN uppercased and cyrillic symbols replaced with latin
+vinString :: FieldType ByteString
+vinString = FieldType id (withString vinConvert <$> fieldReader byteString) where
+	vinConvert :: String -> String
+	vinConvert = map (convert . toUpper)
+
+	convert :: Char -> Char
+	convert ch = case ch of
+		'А' -> 'A'
+		'В' -> 'B'
+		'Е' -> 'E'
+		'З' -> '3'
+		'К' -> 'K'
+		'М' -> 'M'
+		'О' -> 'O'
+		'Р' -> 'P'
+		'С' -> 'C'
+		'Т' -> 'T'
+		'У' -> 'Y'
+		'Х' -> 'X'
+		_ -> ch
+
 arcModelCode             = "modelCode"                      ~:: byteString
 buyDate                  = "car_buyDate"                        ~:: time
 carMaker                 = "car_make"                           ~:: carMakers
@@ -469,4 +491,4 @@ serviceInterval          = "cardNumber_serviceInterval"                ~:: int
 validFrom                = "cardNumber_validFrom"                      ~:: time
 validUntil               = "cardNumber_validUntil"                     ~:: time
 validUntilMilage         = "cardNumber_validUntilMilage"               ~:: int
-vin                      = "car_vin"                            ~:: notNull upperByteString
+vin                      = "car_vin"                            ~:: notNull vinString
