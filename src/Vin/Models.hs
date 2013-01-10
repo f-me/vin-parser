@@ -355,6 +355,27 @@ b2c = withModel b2cModel (<: "Модель автомобиля") "b2c" [
 	plateNum <: "Гос номер",
 	vin <: "Идентификационный номер (VIN)"]
 
+citroenPeugeot :: Dict Model
+citroenPeugeot = do
+	fmake <- makersTable
+	allCarModels <- allCars
+	let
+		lookupModel mk mdl = fromMaybe "" $ do
+			mkDict <- M.lookup mk allCarModels
+			M.lookup mdl mkDict
+		checkModel :: FieldType ByteString
+		checkModel = verifyType (not . C8.null) "Invalid car model" byteString
+	model' "citroenPeugeot?" [
+		warrantyStart <: "VALID_FROM",
+		warrantyEnd <: "VALID_TO",
+		vin <: "VIN_NUMBER",
+		plateNum <: "LICENCE_PLATE_NO",
+		fmake <: "MAKE",
+		("car_model" ~:: checkModel) <:: (lookupModel <$> ("MAKE" `typed` byteString) <*> ("MODEL" `typed` byteString)),
+		buyDate <: "FIRST_REGISTRATION_DATE",
+		makeYear <: "VEHICLE_TYPE",
+		checkupMileage <: "MILEAGE"]
+
 universal :: Dict (String -> Model)
 universal = do
 	fmake <- makersTable
@@ -492,3 +513,5 @@ validFrom                = "cardNumber_validFrom"                      ~:: time
 validUntil               = "cardNumber_validUntil"                     ~:: time
 validUntilMilage         = "cardNumber_validUntilMilage"               ~:: int
 vin                      = "car_vin"                            ~:: notNull vinString
+warrantyStart      = "car_warrantyStart"         ~:: time
+warrantyEnd        = "car_warrantyEnd"           ~:: time
