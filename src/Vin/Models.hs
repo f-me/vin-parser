@@ -355,8 +355,8 @@ b2c = withModel b2cModel (<: "Модель автомобиля") "b2c" [
 	plateNum <: "Гос номер",
 	vin <: "Идентификационный номер (VIN)"]
 
-citroenPeugeot :: Dict Model
-citroenPeugeot = do
+citroenPeugeot :: String -> Dict Model
+citroenPeugeot progname = do
 	fmake <- makersTable
 	allCarModels <- allCars
 	let
@@ -365,7 +365,7 @@ citroenPeugeot = do
 			M.lookup mdl mkDict
 		checkModel :: FieldType ByteString
 		checkModel = verifyType (not . C8.null) "Invalid car model" byteString
-	model' "citroenPeugeot?" [
+	model' progname [
 		warrantyStart <: "VALID_FROM",
 		warrantyEnd <: "VALID_TO",
 		vin <: "VIN_NUMBER",
@@ -410,7 +410,25 @@ universal = do
 
 models :: Dict (String -> Maybe Model)
 models = do
-	m <- sequence [ford, fordPlus, vwMotor, vwCommercial, opel, hummer, chevroletNAO, chevroletKorea, cadillac, vwRuslan, chartis, vwAvilon, atlantM, autocraft, europlan, b2c]
+	m <- sequence [
+		ford,
+		fordPlus,
+		vwMotor,
+		vwCommercial,
+		opel,
+		hummer,
+		chevroletNAO,
+		chevroletKorea,
+		cadillac,
+		vwRuslan,
+		chartis,
+		vwAvilon,
+		atlantM,
+		autocraft,
+		europlan,
+		b2c,
+		citroenPeugeot "citroen",
+		citroenPeugeot "peugeot"]
 	u <- universal
 	ps <- programsList
 	return $ \p -> find ((== p) . modelProgram) m <|> fmap u (find (== p) ps)
