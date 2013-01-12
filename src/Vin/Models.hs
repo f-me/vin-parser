@@ -365,7 +365,7 @@ citroenPeugeot progname = do
 			M.lookup mdl mkDict
 		checkModel :: FieldType ByteString
 		checkModel = verifyType (not . C8.null) "Invalid car model" byteString
-	model' progname [
+	return $ model' progname [
 		warrantyStart <: "VALID_FROM",
 		warrantyEnd <: "VALID_TO",
 		vin <: "VIN_NUMBER",
