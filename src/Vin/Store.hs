@@ -119,7 +119,10 @@ storeErrorLog
     => FilePath
     -> Conduit (DataRow, String) m DataRow
 storeErrorLog fLog = conduitIO
-    (IO.openFile fLog IO.WriteMode)
+    (do
+        hFile <- IO.openFile fLog IO.WriteMode
+        IO.hSetEncoding hFile IO.utf8
+        return hFile)
     IO.hClose
     (\h (r, err) -> do
         liftIO $ IO.hPutStrLn h err

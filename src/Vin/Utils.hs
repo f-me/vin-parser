@@ -9,6 +9,7 @@ import qualified Data.ByteString.Lazy as L
 
 import Data.Encoding (decodeStrictByteString, encodeStrictByteString)
 import Data.Encoding.CP1251
+import Data.Encoding.UTF8
 
 import qualified Data.Map as M
 
@@ -18,11 +19,11 @@ encodeCP1251 :: DataRow -> DataRow
 encodeCP1251 m = M.map enc m'
   where
     m' = M.mapKeys enc m
-    enc bs = encodeStrictByteString CP1251 $ B.unpack bs
+    enc = encodeStrictByteString CP1251 . decodeStrictByteString UTF8
 
 decodeCP1251 :: DataRow -> DataRow
 decodeCP1251 m = M.map enc m'
   where
     m' = M.mapKeys enc m
-    enc s = B.pack $ decodeStrictByteString CP1251 s
+    enc =  encodeStrictByteString UTF8 . decodeStrictByteString CP1251
 
