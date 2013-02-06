@@ -36,10 +36,7 @@ data ModelField a = ModelField {
 
 -- | Field by name
 (~::) :: String -> FieldType a -> ModelField a
-name ~:: tp = ModelField tp $ \act -> (encodeString name, do
-    v <- showField tp <$> act
-    v' <- genField (encodeString name) v (fieldReader tp)
-    return $ showField tp v')
+name ~:: tp = ModelField tp $ \act -> (encodeString name, showField tp <$> act)
 
 -- | Optional field by name, and ignores NoColumn errors
 (~::?) :: String -> FieldType a -> ModelField (Maybe a)

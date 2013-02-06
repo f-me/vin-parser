@@ -6,6 +6,7 @@ module Vin.Models (
     models
     ) where
 
+import Control.Arrow
 import Control.Applicative
 import Control.Monad.Error
 import Control.Monad.Reader
@@ -38,25 +39,21 @@ programs = "resources/site-config/dictionaries/Programs.json"
 colors :: FilePath
 colors = "resources/site-config/dictionaries/Colors.json"
 
-getCars :: Value -> String -> [String]
-getCars v c = maybe [] (map (T.unpack . label)) $ getMember v ["entries", c]
+getSubMap :: Value -> [String] -> M.Map ByteString ByteString
+getSubMap v sub = maybe M.empty (M.unions . map mk) $ getMember v ("entries" : sub) where
+	mk e = M.singleton (T.encodeUtf8 . value $ e) (T.encodeUtf8 . label $ e)
 
 getCarsReverseMap :: Value -> String -> M.Map ByteString ByteString
-getCarsReverseMap v c = maybe M.empty (M.unions . map mk) $ getMember v ["entries", c] where
-	mk e = M.singleton (T.encodeUtf8 . label $ e) (T.encodeUtf8 . value $ e)
+getCarsReverseMap v c = reverseMap $ getSubMap v [c]
 
-getReverseMap :: Value -> M.Map ByteString ByteString
-getReverseMap v = maybe M.empty (M.unions . map mk) $ getMember v ["entries"] where
-	mk e = M.singleton (T.encodeUtf8 . label $ e) (T.encodeUtf8 . value $ e)
-
-getMakers :: Value -> M.Map ByteString ByteString
-getMakers = getReverseMap
+getMap :: Value -> M.Map ByteString ByteString
+getMap v = getSubMap v []
 
 getPrograms :: Value -> [String]
 getPrograms v = maybe [] (map (T.unpack . value)) $ getMember v ["entries"]
 
 getColors :: Value -> M.Map ByteString ByteString
-getColors = getReverseMap
+getColors = reverseMap . getMap
 
 data CarDictionaries = CarDictionaries {
 	modelsDict :: Value,
@@ -74,24 +71,18 @@ cars s = do
 	cars' <- asks ((`getCarsReverseMap` s) . modelsDict)
 	return ("car_model" ~:: tableLowCase cars')
 
--- | Gets model-value by make-label and model-label
-allCars :: Dict (M.Map ByteString (M.Map ByteString ByteString))
-allCars = do
-	mk' <- asks (getMakers . makersDict)
-	fmap M.unions $ forM (M.toList mk') $ \(mkLabel, mkValue) -> do
-		cs' <- asks ((`getCarsReverseMap` (T.unpack . T.decodeUtf8 $ mkValue)) . modelsDict)
-		return $ M.singleton mkLabel cs'
-
--- | Cars reader
-carsList :: String -> Dict (ModelField (Maybe ByteString))
-carsList s = do
-	cars' <- asks ((`getCars` s) . modelsDict)
-	return ("car_model" ~::? oneOfNoCaseByte cars')
-
 makersTable :: Dict (ModelField (Maybe ByteString))
 makersTable = do
-	mk' <- asks (getMakers . makersDict)
+	mk' <- asks (reverseMap . getMap . makersDict)
 	return ("car_make" ~::? tableLowCase mk')
+
+-- | Get models table by make-value 
+modelsTable :: Dict (M.Map ByteString (ModelField (Maybe ByteString)))
+modelsTable = do
+	mk' <- asks (getMap . makersDict)
+	fmap M.unions $ forM (M.toList mk') $ \(mkValue, _) -> do
+		cs' <- asks ((`getCarsReverseMap` (T.unpack . T.decodeUtf8 $ mkValue)) . modelsDict)
+		return $ M.singleton mkValue ("car_model" ~::? tableLowCase cs')
 
 programsList :: Dict [String]
 programsList = asks (getPrograms . programsDict)
@@ -100,6 +91,10 @@ colorsTable :: Dict (ModelField (Maybe ByteString))
 colorsTable = do
 	c' <- asks (getColors . colorsDict)
 	return ("car_color" ~::? tableLowCase c')
+
+-- | Reverse map
+reverseMap :: (Ord k, Ord a) => M.Map k a -> M.Map a k
+reverseMap = M.fromList . map (snd &&& fst) . M.toList
 
 -- | Run with dictionary
 runWithDicts :: FilePath -> FilePath -> FilePath -> FilePath -> Dict a -> IO (Maybe a)
@@ -358,20 +353,18 @@ b2c = withModel b2cModel (<: "Модель автомобиля") "b2c" [
 citroenPeugeot :: String -> Dict Model
 citroenPeugeot progname = do
 	fmake <- makersTable
-	allCarModels <- allCars
-	let
-		lookupModel mk mdl = fromMaybe "" $ do
-			mkDict <- M.lookup mk allCarModels
-			M.lookup mdl mkDict
-		checkModel :: FieldType ByteString
-		checkModel = verifyType (not . C8.null) "Invalid car model" byteString
+	fmodel <- modelsTable
 	return $ model' progname [
 		warrantyStart <: "VALID_FROM",
 		warrantyEnd <: "VALID_TO",
 		vin <: "VIN_NUMBER",
 		plateNum <: "LICENCE_PLATE_NO",
 		fmake <: "MAKE",
-		("car_model" ~:: checkModel) <:: (lookupModel <$> ("MAKE" `typed` byteString) <*> ("MODEL" `typed` byteString)),
+		("car_model" ~::? byteString) <:: (do
+			mk <- "MAKE" `typed` modelFieldType fmake
+			case mk of
+				Nothing -> return Nothing
+				Just mk' -> "MODEL" `typed` modelFieldType (fmodel M.! mk')),
 		buyDate <: "FIRST_REGISTRATION_DATE",
 		makeYear <: "VEHICLE_TYPE",
 		checkupMileage <: "MILEAGE"]
@@ -379,22 +372,19 @@ citroenPeugeot progname = do
 universal :: Dict (String -> Model)
 universal = do
 	fmake <- makersTable
+	fmodel <- modelsTable
 	col <- colorsTable
-	allCarModels <- allCars
-	let
-		lookupModel :: ByteString -> ByteString -> ByteString
-		lookupModel mk mdl = fromMaybe "" $ do
-			mkDict <- M.lookup mk allCarModels
-			M.lookup mdl mkDict
-		checkModel :: FieldType ByteString
-		checkModel = verifyType (not . C8.null) "Invalid car model" byteString
 	return $ \p -> model' p [
 		vin <: "VIN",
 		ownerName <: "ФИО владельца",
 		ownerPhone <: "Контактный телефон владельца",
 		ownerEmail <: "Email владельца",
 		fmake <: "Марка",
-		("car_model" ~:: checkModel) <:: (lookupModel <$> ("Марка" `typed` byteString) <*> ("Модель" `typed` byteString)),
+		("car_model" ~::? byteString) <:: (do
+			mk <- "Марка" `typed` modelFieldType fmake
+			case mk of
+				Nothing -> return Nothing
+				Just mk' -> "Модель" `typed` modelFieldType (fmodel M.! mk')),
 		plateNum <: "Госномер",
 		makeYear <: "Год производства автомобиля",
 		col <: "Цвет",
