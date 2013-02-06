@@ -6,9 +6,10 @@ module Vin.Model (
     parse
     ) where
 
-import Control.Arrow (first)
+import Control.Arrow ((***))
 import Control.Applicative ((<$>))
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as B
 import qualified Data.Map as M
 import Data.Either (partitionEithers)
 
@@ -33,6 +34,6 @@ parse
     :: Model
     -> M.Map ByteString ByteString
     -> ([RowError ByteString TypeError], [(ByteString, ByteString)])
-parse m d = first concat $ partitionEithers $ map parseField $ modelFields m where
+parse m d = (concat *** filter (not . B.null . snd)) $ partitionEithers $ map parseField $ modelFields m where
     parseField :: ModelRow -> Either [RowError ByteString TypeError] (ByteString, ByteString)
     parseField (name, parser) = row d $ ((,) name) <$> parser
