@@ -1,6 +1,6 @@
 module Vin.Load (
     DataError,
-    DataRowError,
+    DataRowError, DataRowMaybeError,
     csv, xlsx,
     Loader, loadersContentType, loadersExtension,
     dup, safeMap, safeMapM
@@ -25,6 +25,8 @@ import Vin.Utils
 type DataError c a = (c, Either String a)
 
 type DataRowError = DataError DataRow DataRow
+-- | Parsed DataRow with parse errors
+type DataRowMaybeError = DataError DataRow (Maybe String, DataRow)
 
 -- | Load CSV
 csv

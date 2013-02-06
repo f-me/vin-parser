@@ -5,6 +5,7 @@ module Vin.Text (
     FieldType(..),
     TextField, Text,
     TypeError(..),
+    optField,
     decodeString, encodeString, withString,
     byteString, upperByteString, string, upperString, int, intByte,
     table, tableLowCase, tableByte, (<<~), oneOf, oneOfByte, oneOfNoCase, oneOfNoCaseByte, oneOfBy, oneOfByByte,
@@ -53,6 +54,15 @@ data TypeError = InvalidType String
 instance Error TypeError where
     noMsg = InvalidType ""
     strMsg = InvalidType
+
+-- | Optional value
+-- Nothing on empty input (zero or more spaces)
+optField :: FieldType a -> FieldType (Maybe a)
+optField f = FieldType (maybe "" (showField f)) $ do
+    s <- fieldReader string
+    if null s
+        then return Nothing
+        else fmap Just (fieldReader f)
 
 -- | Trimmed ByteString
 byteString :: FieldType ByteString

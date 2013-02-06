@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances, MultiParamTypeClasses #-}
 -- | Module for row processing.
 -- The main goal is that processing of every field may fail,
 -- but processing of row is Applicative (and Alternative),
@@ -17,6 +17,8 @@ module Vin.Row (
     RowError(..),
     Row,
     row,
+    withNoColumns,
+    genField,
     column
     ) where
 
@@ -42,6 +44,16 @@ row m r = case runWriter (runReaderT (runRow r) m) of
     (Just x, _) -> Right x
     (Nothing, es) -> Left $ nub es
 
+-- | Ignore NoColumn errors
+withNoColumns :: (Eq k, Eq e) => Row k e a v -> Row k e a v
+withNoColumns (Row act) = Row $ do
+    rd <- ask
+    lift $ censor (filter (not . isNoColumn)) $ runReaderT act rd
+    where
+        isNoColumn :: RowError k e -> Bool
+        isNoColumn (NoColumn _) = True
+        isNoColumn _ = False
+
 instance Functor (Row k e a) where
     fmap f = Row . fmap (fmap f) . runRow
 
@@ -57,7 +69,23 @@ instance Alternative (Row k e a) where
     l <|> r = Row $ do
         l' <- runRow l
         r' <- runRow r
-        return (l' <|> r')        
+        return (l' <|> r')
+
+instance Monad (Row k e a) where
+    return = Row . return . Just
+    x >>= f = Row $ do
+        v <- runRow x
+        case v of
+            Nothing -> return Nothing
+            Just v' -> runRow $ f v'
+
+-- | Process generic field
+genField :: Ord k => k -> a -> Field e a v -> Row k e a v
+genField key v f = Row $ case runReader (runErrorT (runField f)) v of
+    Left msg -> do
+        lift $ tell [FieldError key msg]
+        return Nothing
+    Right val -> return (Just val)
 
 -- | Process field at column
 -- Collect errors from fields processing

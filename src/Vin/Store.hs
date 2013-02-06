@@ -61,10 +61,10 @@ redisSetWithKey' key val = do
 
 type ParseError = (DataRow, [RowError ByteString TypeError])
 
-parseRow :: Model -> DataRow -> Either String DataRow
+parseRow :: Model -> DataRow -> (Maybe String, DataRow)
 parseRow m r = case parse m r of
-    Left es -> Left $ formatErrors es
-    Right s -> Right $ M.fromList $ zip (map fst (modelFields m)) s
+    ([], s) -> (Nothing, M.fromList s)
+    (es, s) -> (Just $ formatErrors es, M.fromList s)
     where
         formatErrors ers = intercalate "; " $ map formatError ers
         formatError (NoColumn name) = "No field " ++ decodeString name
@@ -85,7 +85,7 @@ sinkXFile
     -> Sink DataRowError m ()
 sinkXFile store fError fLog stats ml
     =   safeMap trimKeys
-    =$ safeMapM (parseRow ml)
+    =$ safeMap (parseRow ml)
     =$ storeCorrect ml store stats
     =$ storeErrorLog fLog
     =$ writeIncorrect fError
@@ -95,16 +95,23 @@ storeCorrect
     => Model
     -> (R.Connection -> DataRow -> IO ())
     -> (Int -> Int -> IO ())
-    -> Conduit DataRowError m (DataRow, String)
+    -> Conduit DataRowMaybeError m (DataRow, String)
 
 storeCorrect _ store stats = conduitIO
     ((,) <$> R.connect R.defaultConnectInfo <*> newMVar (0, 0))
     (\(conn, _) -> runRedis conn quit >> return ())
     (\(conn, statsVar) (src, r) -> case r of
-        Right r' -> liftIO $ do
-            store conn r'
+        -- No errors, save store row
+        Right (Nothing, dat) -> liftIO $ do
+            store conn dat
             newUpload statsVar
             return (IOProducing [])
+        -- Errors, store parsed row and produce errors
+        Right (Just err, dat) -> liftIO $ do
+            store conn dat
+            newFail statsVar
+            return (IOProducing [(src, err)])
+        -- No parsed data, only error
         Left e' -> liftIO $ do
             newFail statsVar
             return $ IOProducing [(src, e')])

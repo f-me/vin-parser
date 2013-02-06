@@ -2,7 +2,7 @@
 -- for model definition
 module Vin.ModelField (
     ModelField(..),
-    (~::),
+    (~::), (~::?),
     (<::),
     (<:),
 	(<:=),
@@ -16,6 +16,7 @@ module Vin.ModelField (
     module Vin.Text.Specific
     ) where
 
+import Control.Arrow
 import Control.Applicative
 import Control.Monad.Error ()
 import Data.ByteString (ByteString)
@@ -35,7 +36,15 @@ data ModelField a = ModelField {
 
 -- | Field by name
 (~::) :: String -> FieldType a -> ModelField a
-name ~:: tp = ModelField tp $ \act -> (encodeString name, showField tp <$> act)
+name ~:: tp = ModelField tp $ \act -> (encodeString name, do
+    v <- showField tp <$> act
+    v' <- genField (encodeString name) v (fieldReader tp)
+    return $ showField tp v')
+
+-- | Optional field by name, and ignores NoColumn errors
+(~::?) :: String -> FieldType a -> ModelField (Maybe a)
+name ~::? tp = ModelField fType (second withNoColumns . connect) where
+    (ModelField fType connect) = name ~:: optField tp
 
 -- | Connect field with columns
 (<::) :: ModelField a -> Text a -> ModelRow
@@ -46,8 +55,8 @@ f <:: act = connectToRow f act
 f <: name = f <:: (name `typed` modelFieldType f)
 
 -- | Constant value
-(<:=) :: ModelField ByteString -> String -> ModelRow
-f <:= value = f <:: pure (encodeString value)
+(<:=) :: ModelField (Maybe ByteString) -> String -> ModelRow
+f <:= value = f <:: pure (Just $ encodeString value)
 
 -- | Make column action from column name and type
 typed :: String -> FieldType a -> Text a

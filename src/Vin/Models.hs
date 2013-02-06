@@ -83,23 +83,23 @@ allCars = do
 		return $ M.singleton mkLabel cs'
 
 -- | Cars reader
-carsList :: String -> Dict (ModelField ByteString)
+carsList :: String -> Dict (ModelField (Maybe ByteString))
 carsList s = do
 	cars' <- asks ((`getCars` s) . modelsDict)
-	return ("car_model" ~:: oneOfNoCaseByte cars')
+	return ("car_model" ~::? oneOfNoCaseByte cars')
 
-makersTable :: Dict (ModelField ByteString)
+makersTable :: Dict (ModelField (Maybe ByteString))
 makersTable = do
 	mk' <- asks (getMakers . makersDict)
-	return ("car_make" ~:: tableLowCase mk')
+	return ("car_make" ~::? tableLowCase mk')
 
 programsList :: Dict [String]
 programsList = asks (getPrograms . programsDict)
 
-colorsTable :: Dict (ModelField ByteString)
+colorsTable :: Dict (ModelField (Maybe ByteString))
 colorsTable = do
 	c' <- asks (getColors . colorsDict)
-	return ("car_color" ~:: tableLowCase c')
+	return ("car_color" ~::? tableLowCase c')
 
 -- | Run with dictionary
 runWithDicts :: FilePath -> FilePath -> FilePath -> FilePath -> Dict a -> IO (Maybe a)
@@ -135,8 +135,8 @@ mheads [] = []
 mheads (l:_) = l
 
 withModel
-	:: Dict (ModelField ByteString)
-	-> (ModelField ByteString -> ModelRow)
+	:: Dict (ModelField a)
+	-> (ModelField a -> ModelRow)
 	-> String
 	-> [ModelRow]
 	-> Dict Model
@@ -172,9 +172,9 @@ vwMotor = withModel vwModel (<:: column (encodeString "Модель") vwModelVal
 	carMaker <:= "vw",
 	-- vwModel <:: ((head . C8.words) <$> ("Модель" `typed` byteString)),
 	-- TODO: Split this column and extract motor & transmission
-	color <:: column (encodeString "Цвет авт") vwColor,
-	carMotor <:: (column (encodeString "Модель") vwMotorType <|> pure ""),
-	carTransmission <:: column (encodeString "Модель") vwTransmission,
+	color <:: fmap Just (column (encodeString "Цвет авт") vwColor),
+	carMotor <:: fmap Just ((column (encodeString "Модель") vwMotorType <|> pure "")),
+	carTransmission <:: fmap Just (column (encodeString "Модель") vwTransmission),
 	makeYear <: "Модельный год",
 	vin <: "VIN",
 	seller <: "Дилер получатель",
@@ -225,14 +225,14 @@ vwCommercial = withModel vwModel (<:: ((encodeString . mheads . words . decodeSt
 	vin <: "VIN",
 	makeYear <: "модельный год",
 	plateNum <: "госномер",
-	ownerName <:: wordsF ["имя", "фамилия", "отчество"],
-	ownerPhone <:: wordsF ["тел1", "тел2"]]
+	ownerName <:: fmap Just (wordsF ["имя", "фамилия", "отчество"]),
+	ownerPhone <:: fmap Just (wordsF ["тел1", "тел2"])]
 
 opel :: Dict Model
 opel = withModel opelModel (<: "Model") "opel" [
 	carMaker <:= "opel",
 	vin <:: (("VIN" `typed` modelFieldType vin) <|> ("Previous VIN (SKD)" `typed` modelFieldType vin)),
-	carMaker <:: (("Brand" `typed` byteString) <|> pure (encodeString "Opel")),
+	carMaker <:: fmap Just ((("Brand" `typed` byteString) <|> pure (encodeString "Opel"))),
 	seller <: "Retail Dealer",
 	buyDate <: "Retail Date"]
 
@@ -287,10 +287,10 @@ vwRuslan = withModel vwModel onModel "ruslan" [
 		-- onModel = (<:: (rusVW <$> ("Модель Автомобиля VW" `typed` byteString)))
 
 chartis :: Dict Model
-chartis = withModel chartisModel (<:: capitalized "Модель Автомобиля") "chartis" [
+chartis = withModel chartisModel (<:: fmap Just (capitalized "Модель Автомобиля")) "chartis" [
 	cardNumber <: "Подрядковый номер клубной карты",
 	manager <: "ФИО ответственного лица, внесшего данные в XLS файл",
-	carMaker <:: capitalized "Марка Автомобиля",
+	carMaker <:: fmap Just (capitalized "Марка Автомобиля"),
 	vin <: "VIN номер Автомобиля",
 	validFrom <: "Дата регистрации в программе",
 	validUntil <: "Программа действует до (Дата)"]
@@ -347,10 +347,10 @@ b2c = withModel b2cModel (<: "Модель автомобиля") "b2c" [
 	manager <: "Сотрудник РАМК",
 	cardNumber <: "Номер карты",
 	programName <: "Тип карты",
-	ownerName <:: wordsF ["Фамилия клиента", "Имя клиента", "Отчество клиента"],
-	ownerPhone <:: wordsF ["Телефон клиента Мобильный", "Телефон клиента Домашний"],
+	ownerName <:: fmap Just (wordsF ["Фамилия клиента", "Имя клиента", "Отчество клиента"]),
+	ownerPhone <:: fmap Just (wordsF ["Телефон клиента Мобильный", "Телефон клиента Домашний"]),
 	ownerEmail <: "Е-МAIL клиента",
-	carMaker <:: capitalized "Марка автомобиля",
+	carMaker <:: fmap Just (capitalized "Марка автомобиля"),
 	makeYear <: "Год выпуска",
 	plateNum <: "Гос номер",
 	vin <: "Идентификационный номер (VIN)"]
@@ -382,6 +382,7 @@ universal = do
 	col <- colorsTable
 	allCarModels <- allCars
 	let
+		lookupModel :: ByteString -> ByteString -> ByteString
 		lookupModel mk mdl = fromMaybe "" $ do
 			mkDict <- M.lookup mk allCarModels
 			M.lookup mdl mkDict
@@ -440,9 +441,9 @@ vwModel :: Dict (ModelField ByteString)
 fordModel :: Dict (ModelField ByteString)
 bmwModel :: Dict (ModelField ByteString)
 hummerModel :: Dict (ModelField ByteString)
-europlanModel :: Dict (ModelField ByteString)
-b2cModel :: Dict (ModelField ByteString) -- FIXME: Is this correct?
-chartisModel :: Dict (ModelField ByteString) -- FIXME: Is this correct?
+europlanModel :: Dict (ModelField (Maybe ByteString))
+b2cModel :: Dict (ModelField (Maybe ByteString)) -- FIXME: Is this correct?
+chartisModel :: Dict (ModelField (Maybe ByteString)) -- FIXME: Is this correct?
 
 -- Synonyms
 rusTable :: M.Map ByteString ByteString
@@ -505,31 +506,31 @@ vinString = FieldType id (withString vinConvert <$> fieldReader byteString) wher
 		'Х' -> 'X'
 		_ -> ch
 
-arcModelCode             = "modelCode"                      ~:: byteString
-buyDate                  = "car_buyDate"                        ~:: time
-carMaker                 = "car_make"                           ~:: carMakers
-carModel                 = "car_model"                          ~:: byteString
-carMotor                 = "car_motor"                          ~:: byteString
-carTransmission          = "car_transmission"                   ~:: byteString
-cardNumber               = "cardNumber_cardNumber"                     ~:: byteString
-cardOwner                  = "cardNumber_cardOwner"                    ~:: byteString
-checkupDate              = "car_checkupDate"                    ~:: time
-checkupMileage              = "car_checkupMileage"                    ~:: int
-color                    = "car_color"                          ~:: byteString
-lastTODate               = "car_checkupDate"                    ~:: time
-manager                  = "cardNumber_manager"                        ~:: byteString
-milageTO                 = "cardNumber_milageTO"                       ~:: byteString
-makeYear                = "car_makeYear"                      ~:: int
-ownerEmail               = "contact_ownerEmail"                     ~:: email
-ownerName                = "contact_ownerName"                      ~:: byteString
-ownerPhone               = "contact_ownerPhone1"                     ~:: phone
-plateNum              = "car_plateNum"                       ~:: byteString
-programName              = "program"                       ~:: byteString
-seller                   = "car_seller"                         ~:: byteString
-serviceInterval          = "cardNumber_serviceInterval"                ~:: int
-validFrom                = "cardNumber_validFrom"                      ~:: time
-validUntil               = "cardNumber_validUntil"                     ~:: time
-validUntilMilage         = "cardNumber_validUntilMilage"               ~:: int
+arcModelCode             = "modelCode"                      ~::? byteString
+buyDate                  = "car_buyDate"                        ~::? time
+carMaker                 = "car_make"                           ~::? carMakers
+carModel                 = "car_model"                          ~::? byteString
+carMotor                 = "car_motor"                          ~::? byteString
+carTransmission          = "car_transmission"                   ~::? byteString
+cardNumber               = "cardNumber_cardNumber"                     ~::? byteString
+cardOwner                  = "cardNumber_cardOwner"                    ~::? byteString
+checkupDate              = "car_checkupDate"                    ~::? time
+checkupMileage              = "car_checkupMileage"                    ~::? int
+color                    = "car_color"                          ~::? byteString
+lastTODate               = "car_checkupDate"                    ~::? time
+manager                  = "cardNumber_manager"                        ~::? byteString
+milageTO                 = "cardNumber_milageTO"                       ~::? byteString
+makeYear                = "car_makeYear"                      ~::? int
+ownerEmail               = "contact_ownerEmail"                     ~::? email
+ownerName                = "contact_ownerName"                      ~::? byteString
+ownerPhone               = "contact_ownerPhone1"                     ~::? phone
+plateNum              = "car_plateNum"                       ~::? byteString
+programName              = "program"                       ~::? byteString
+seller                   = "car_seller"                         ~::? byteString
+serviceInterval          = "cardNumber_serviceInterval"                ~::? int
+validFrom                = "cardNumber_validFrom"                      ~::? time
+validUntil               = "cardNumber_validUntil"                     ~::? time
+validUntilMilage         = "cardNumber_validUntilMilage"               ~::? int
 vin                      = "car_vin"                            ~:: notNull vinString
-warrantyStart      = "car_warrantyStart"         ~:: time
-warrantyEnd        = "car_warrantyEnd"           ~:: time
+warrantyStart      = "car_warrantyStart"         ~::? time
+warrantyEnd        = "car_warrantyEnd"           ~::? time

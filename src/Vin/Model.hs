@@ -6,9 +6,11 @@ module Vin.Model (
     parse
     ) where
 
+import Control.Arrow (first)
+import Control.Applicative ((<$>))
 import Data.ByteString (ByteString)
 import qualified Data.Map as M
-import Data.Traversable (sequenceA)
+import Data.Either (partitionEithers)
 
 import Vin.Text
 import Vin.Row
@@ -26,9 +28,11 @@ model :: String -> [ModelRow] -> Model
 model = Model
 
 -- | Try to parse row
--- Returns list of errors or list of parsed values
-parse
+-- Returns list of errors and parsed values
+parse 
     :: Model
     -> M.Map ByteString ByteString
-    -> Either [RowError ByteString TypeError] [ByteString]
-parse m d = row d (sequenceA (map snd (modelFields m)))
+    -> ([RowError ByteString TypeError], [(ByteString, ByteString)])
+parse m d = first concat $ partitionEithers $ map parseField $ modelFields m where
+    parseField :: ModelRow -> Either [RowError ByteString TypeError] (ByteString, ByteString)
+    parseField (name, parser) = row d $ ((,) name) <$> parser
