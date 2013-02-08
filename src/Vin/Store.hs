@@ -21,18 +21,17 @@ import Data.Conduit.Util hiding (zip)
 import Data.CSV.Conduit hiding (Row, MapRow)
 
 import Data.Char (isSpace)
-import Data.List (intercalate)
 import qualified Data.Map as M
-import Data.Text as T (Text)
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T (encodeUtf8)
 import Data.Typeable
 
 import Database.Redis as R
 
 import qualified System.IO as IO
 
-import Vin.Text (TypeError(..))
-import Vin.Text.String
-import Vin.Row
+import Vin.Field
 import Vin.Model
 import Vin.Load
 import Vin.Utils
@@ -44,32 +43,28 @@ data VinUploadException = VinUploadException {
 
 instance Exception VinUploadException
 
-redisSetVin :: R.Connection -> DataRow -> IO ()
-redisSetVin c val = runRedis c sets where
-    sets = mapM_ (\k -> redisSetWithKey' (key k) val) vins
-    -- It seems that car can have several keys
-    -- Duplicate as temporary solution
-    vins = C8.words $ val M.! "car_vin"
-    key k = C8.concat ["vin:", k]
+redisSetVin :: R.Connection -> Row -> IO ()
+redisSetVin c val
+    | M.member "car_vin" val = runRedis c sets
+    | otherwise = return ()
+        where
+            sets = mapM_ (\k -> redisSetWithKey' (key k) val) vins
+            -- It seems that car can have several keys
+            -- Duplicate as temporary solution
+            vins = T.words $ val M.! "car_vin"
+            key k = T.concat ["vin:", k]
 
-redisSetWithKey' :: ByteString -> DataRow -> Redis ()
+redisSetWithKey' :: Text -> Row -> Redis ()
 redisSetWithKey' key val = do
-    res <- hmset key $ M.toList val
+    res <- hmset (T.encodeUtf8 key) $ map (T.encodeUtf8 *** T.encodeUtf8) $ M.toList val
     case res of
         Left err -> liftIO $ print err -- ???
         _ -> return ()
 
-type ParseError = (DataRow, [RowError ByteString TypeError])
-
-parseRow :: Model -> DataRow -> (Maybe String, DataRow)
-parseRow m r = case parse m r of
-    ([], s) -> (Nothing, M.fromList s)
-    (es, s) -> (Just $ formatErrors es, M.fromList s)
-    where
-        formatErrors ers = intercalate "; " $ map formatError ers
-        formatError (NoColumn name) = "No field " ++ decodeString name
-        formatError (FieldError name (InvalidType msg)) =
-            "Invalid field " ++ decodeString name ++ ": " ++ msg
+parseRow :: Model -> DataRow -> (Maybe String, Row)
+parseRow m r = case parse m $ decodeRow r of
+    ([], s) -> (Nothing, s)
+    (es, s) -> (Just $ showErrors es, s)
 
 trimKeys :: DataRow -> DataRow
 trimKeys = M.mapKeys trim where
@@ -77,7 +72,7 @@ trimKeys = M.mapKeys trim where
 
 sinkXFile
     :: MonadResource m
-    => (R.Connection -> DataRow -> IO ())
+    => (R.Connection -> Row -> IO ())
     -> FilePath
     -> FilePath
     -> (Int -> Int -> IO ())
@@ -93,7 +88,7 @@ sinkXFile store fError fLog stats ml
 storeCorrect
     :: MonadResource m
     => Model
-    -> (R.Connection -> DataRow -> IO ())
+    -> (R.Connection -> Row -> IO ())
     -> (Int -> Int -> IO ())
     -> Conduit DataRowMaybeError m (DataRow, String)
 

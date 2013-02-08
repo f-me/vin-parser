@@ -20,13 +20,15 @@ import qualified Codec.Xlsx.Parser as Xlsx
 
 import qualified Data.Text.Encoding as T
 
+import Vin.Field (Row)
 import Vin.Utils
 
 type DataError c a = (c, Either String a)
 
 type DataRowError = DataError DataRow DataRow
+
 -- | Parsed DataRow with parse errors
-type DataRowMaybeError = DataError DataRow (Maybe String, DataRow)
+type DataRowMaybeError = DataError DataRow (Maybe String, Row)
 
 -- | Load CSV
 csv
