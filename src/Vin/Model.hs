@@ -1,39 +1,36 @@
 -- | Module with model definition and parse function
 module Vin.Model (
+    -- * Model description
     Model(..),
-	ModelRow,
     model,
     parse
     ) where
 
 import Control.Arrow ((***))
-import Control.Applicative ((<$>))
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-import qualified Data.Map as M
+import Control.Applicative (pure)
 import Data.Either (partitionEithers)
+import Data.List (nub)
+import qualified Data.Map as M
+import Data.String (fromString)
+import Data.Text (Text)
 
-import Vin.Text
-import Vin.Row
+import Vin.Field
 
--- | One row of model
-type ModelRow = (ByteString, Text ByteString)
-
--- | Model data
+-- | Model description
 data Model = Model {
     modelProgram :: String,
-    modelFields :: [ModelRow] }
+    modelMapping :: [(String, Field Text)] }
 
--- | Model definition
-model :: String -> [ModelRow] -> Model
-model = Model
+-- | Create @Model@
+model :: String -> [(String, Field Text)] -> Model
+model name maps = Model name $ (("program", text) <~ pure (fromString name)) : maps
 
--- | Try to parse row
--- Returns list of errors and parsed values
-parse 
-    :: Model
-    -> M.Map ByteString ByteString
-    -> ([RowError ByteString TypeError], [(ByteString, ByteString)])
-parse m d = (concat *** filter (not . B.null . snd)) $ partitionEithers $ map parseField $ modelFields m where
-    parseField :: ModelRow -> Either [RowError ByteString TypeError] (ByteString, ByteString)
-    parseField (name, parser) = row d $ ((,) name) <$> parser
+-- | Parse one row, returns list of errors and parsed result
+parse :: Model -> Row -> ([FieldError], Row)
+parse m r = ((nub . concat) *** M.fromList) $ partitionEithers $ map parseField $ modelMapping m where
+    parseField :: (String, Field Text) -> Either [FieldError] (Text, Text)
+    parseField (name, parser) = do
+        v <- evalField parser r
+        case v of
+            Nothing -> Left []
+            Just v' -> return (fromString name, v')
