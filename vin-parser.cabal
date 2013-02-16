@@ -1,5 +1,5 @@
 Name:                vin-parser
-Version:             0.1.8.5
+Version:             0.2.0.0
 Synopsis:            Custom tool for transferring data from files to database.
 License:             BSD3
 Author:              Alexandr `voidex` Ruchkin
@@ -16,13 +16,7 @@ Library
   Exposed-Modules:
     Snap.Snaplet.Vin
     Vin.Field
-    Vin.Row
-    Vin.Text
-    Vin.Text.String
-    Vin.Text.DateTime
-    Vin.Text.Specific
     Vin.Model
-    Vin.ModelField
     Vin.Models
     Vin.Models.Cars
     Vin.Utils
