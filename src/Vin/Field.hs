@@ -9,7 +9,7 @@ module Vin.Field (
     Field(..),
     fieldRead,
     FromField(..),
-    field, tryField, with,
+    field, tryField, with, with_,
     evalField,
 
     -- * Verify and postprocess fields
@@ -157,6 +157,10 @@ tryField name = do
 --
 with :: (String -> Field a) -> String -> (a -> Either String b) -> Field b
 with fld name f  = fld name >>= either (fieldError . FieldError name) return . f
+
+-- | Perform action on field, and if result is Nothing, result to empty field
+with_ :: (String -> Field a) -> String -> (a -> Maybe b) -> Field b
+with_ fld name f = fld name >>= maybe empty return . f
 
 -- | Evaluate @Field@, collecting errors and result.
 evalField :: Field a -> Row -> Either [FieldError] (Maybe a)

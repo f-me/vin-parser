@@ -215,9 +215,9 @@ vwMotor = do
     return $ model "vwMotor" [
         car_make <~ pure "vw",
         car_model <~ with (firstWord . tryField) "Модель" (look vws),
-        car_color <~ with (takeColor . tryField) "Цвет авт" (look cols),
+        car_color <~ with (takeColor . tryField) "Цвет авт" (lookKey cols),
         -- car_motor <~ with tryField "Модель" takeMotor,
-        car_transmission <~ with tryField "Модель" takeTransmission,
+        car_transmission <~ with_ tryField "Модель" takeTransmission,
         car_makeYear <~ tryField "Модельный год",
         car_vin <~ field "VIN",
         car_seller <~ tryField "Дилер получатель",
@@ -225,26 +225,37 @@ vwMotor = do
         ownerName <~ tryField "Контактное лицо покупателя"]
     where
         takeColor :: Field Text -> Field Text
-        takeColor fld = fld >>= maybe empty return . takeColor' where
+        takeColor fld = fld >>= maybe empty return . fmap camelCase . takeColor' where
             takeColor' s = case fst . T.breakOnEnd "`" . snd . T.breakOn "`" $ s of
                 res
                     | T.length res < 2 -> Nothing
                     | otherwise -> Just $ T.init $ T.tail res
+            camelCase :: T.Text -> T.Text
+            camelCase color = case T.words color of
+                [] -> T.empty
+                (c : cs) -> T.concat (T.map toLower c : map upperCase cs)
+            upperCase :: T.Text -> T.Text
+            upperCase = maybe T.empty (\(c, cs) -> T.cons (toUpper c) (T.map toLower cs)) . T.uncons
 
         takeMotor :: Text -> Either String Text
         takeMotor str = maybe err return . find isMotor . T.words $ str where
             isMotor s = T.length s == 3 && (T.index s 1 `elem` ".,")
             err = Left $ "Невозможно определить car_motor из '" ++ T.unpack str ++ "'"
 
-        takeTransmission :: Text -> Either String Text
-        takeTransmission str = maybe err return . listToMaybe . mapMaybe fromTransmission . T.words $ str where
+        takeTransmission :: Text -> Maybe Text
+        takeTransmission str = listToMaybe . mapMaybe fromTransmission . T.words $ str where
             fromTransmission s
                 | "авт.-" `T.isPrefixOf` s = Just "auto"
                 | "авт,-" `T.isPrefixOf` s = Just "auto"
                 | "ручн.-" `T.isPrefixOf` s = Just "mech"
                 | "ручн,-" `T.isPrefixOf` s = Just "mech"
+                | "-мест" `T.isInfixOf` s = Just "mech"
                 | otherwise = Nothing
-            err = Left $ "Невозможно определить тип коробки передач из '" ++ T.unpack str ++ "'"
+
+        -- | Check whether key exists
+        lookKey :: M.Map Text Text -> Text -> Either String Text
+        lookKey tbl key = if key `elem` M.elems tbl then return key else err where
+            err = Left $ "Неверное значение: '" ++ T.unpack key ++ "'"
 
 vwCommercial :: Dict Model
 vwCommercial = do
