@@ -27,6 +27,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Snap.Core
+import           Snap.Http.Server.Config as S
 import           Snap.Snaplet
 import           Snap.Util.FileUploads
 import           System.FilePath
@@ -120,6 +121,14 @@ upload = ifTop $ do
                 (action program info)
                 f
 
+-- | Obtain port number of the Snap application.
+currentPort :: IO Int
+currentPort = do
+  sCfg <- commandLineConfig (emptyConfig :: S.Config Snap a)
+  return $ case getPort sCfg of
+             Just n -> n
+             Nothing -> error "No port"
+
 action :: ByteString -> PartInfo -> String -> Handler b Vin ()
 action program info f = do
     --liftIO $ createLink f f'
@@ -142,8 +151,9 @@ action program info f = do
                     ", rows uploaded: ",
                     T.pack . show $ valid]
         
+    carmaPort <- liftIO currentPort
     liftIO $ forkIO $ do
-        loadFile fUploaded fError fLog program (contentType . T.unpack . T.decodeUtf8 . partContentType $ info) uploadStats
+        loadFile fUploaded fError fLog program (contentType . T.unpack . T.decodeUtf8 . partContentType $ info) uploadStats carmaPort
         `E.catches` [
             E.Handler (\(ex :: VinUploadException) -> return ()),
             E.Handler (\(ex :: E.SomeException) -> return ())]
@@ -214,8 +224,9 @@ uploadData program f = do
                 `withErrorFile` fErrorLink
                 `withErrorLogFile` fLogLink
 
-    liftIO $ forkIO
-        $ (loadFile fUploaded fError fLog (T.encodeUtf8 . T.pack $ program) (extension $ takeExtension fUploaded) uploadStats >> endWith Nothing)
+    carmaPort <- liftIO currentPort
+    liftIO $ forkIO $
+        (loadFile fUploaded fError fLog (T.encodeUtf8 . T.pack $ program) (extension $ takeExtension fUploaded) uploadStats carmaPort >> endWith Nothing)
         `E.catches` [
             E.Handler (\(ex :: VinUploadException) -> endWith Nothing),
             E.Handler (\(ex :: E.SomeException) -> endWith (Just $ fromString $ show ex))]

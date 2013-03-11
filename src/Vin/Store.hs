@@ -2,7 +2,7 @@
 
 module Vin.Store (
     VinUploadException(..),
-    redisSetVin, sinkXFile
+    dbCreateVin, sinkXFile
     ) where
 
 import Control.Applicative
@@ -27,9 +27,9 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T (encodeUtf8)
 import Data.Typeable
 
-import Database.Redis as R
-
 import qualified System.IO as IO
+
+import Carma.HTTP
 
 import Vin.Field
 import Vin.Model
@@ -43,23 +43,25 @@ data VinUploadException = VinUploadException {
 
 instance Exception VinUploadException
 
-redisSetVin :: R.Connection -> Row -> IO ()
-redisSetVin c val
-    | M.member "car_vin" val = runRedis c sets
+dbCreateVin :: Int
+            -- ^ CaRMa port.
+            -> Row 
+            -> IO ()
+dbCreateVin cp val
+    | M.member "carVin" val = dbCreateRow
     | otherwise = return ()
         where
-            sets = mapM_ (\k -> redisSetWithKey' (key k) val) vins
-            -- It seems that car can have several keys
-            -- Duplicate as temporary solution
-            vins = T.words $ val M.! "car_vin"
-            key k = T.concat ["vin:", k]
-
-redisSetWithKey' :: Text -> Row -> Redis ()
-redisSetWithKey' key val = do
-    res <- hmset (T.encodeUtf8 key) $ map (T.encodeUtf8 *** T.encodeUtf8) $ M.toList val
-    case res of
-        Left err -> liftIO $ print err -- ???
-        _ -> return ()
+          dbCreateRow = do
+            createInstance cp "contract" $ 
+                        M.fromList $ 
+                        map (T.encodeUtf8 *** T.encodeUtf8) $
+                        M.toList val
+            return ()
+        --     sets = mapM_ (\k -> redisSetWithKey' (key k) val) vins
+        --     -- It seems that car can have several keys
+        --     -- Duplicate as temporary solution
+        --     vins = T.words $ val M.! car_vin
+        --     key k = T.concat ["vin:", k]
 
 parseRow :: Model -> DataRow -> (Maybe String, Row)
 parseRow m r = case parse m $ decodeRow r of
@@ -72,7 +74,7 @@ trimKeys = M.mapKeys trim where
 
 sinkXFile
     :: MonadResource m
-    => (R.Connection -> Row -> IO ())
+    => (Row -> IO ())
     -> FilePath
     -> FilePath
     -> (Int -> Int -> IO ())
@@ -88,22 +90,22 @@ sinkXFile store fError fLog stats ml
 storeCorrect
     :: MonadResource m
     => Model
-    -> (R.Connection -> Row -> IO ())
+    -> (Row -> IO ())
     -> (Int -> Int -> IO ())
     -> Conduit DataRowMaybeError m (DataRow, String)
 
 storeCorrect _ store stats = conduitIO
-    ((,) <$> R.connect R.defaultConnectInfo <*> newMVar (0, 0))
-    (\(conn, _) -> runRedis conn quit >> return ())
-    (\(conn, statsVar) (src, r) -> case r of
+    (newMVar (0, 0))
+    (const $ return ())
+    (\statsVar (src, r) -> case r of
         -- No errors, save store row
         Right (Nothing, dat) -> liftIO $ do
-            store conn dat
+            store dat
             newUpload statsVar
             return (IOProducing [])
         -- Errors, store parsed row and produce errors
         Right (Just err, dat) -> liftIO $ do
-            store conn dat
+            store dat
             newFail statsVar
             return (IOProducing [(src, err)])
         -- No parsed data, only error
