@@ -103,9 +103,8 @@ storeCorrect _ store stats = conduitIO
             store dat
             newUpload statsVar
             return (IOProducing [])
-        -- Errors, store parsed row and produce errors
+        -- Errors, skip parsed row and produce errors
         Right (Just err, dat) -> liftIO $ do
-            store dat
             newFail statsVar
             return (IOProducing [(src, err)])
         -- No parsed data, only error
