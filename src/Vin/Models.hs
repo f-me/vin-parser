@@ -330,37 +330,14 @@ vwRuslan = do
     vws <- getCarModels "vw"
     return $ model "ruslan" [
         car_make <~ pure "vw",
-        car_model <~ with tryField "Модель Автомобиля VW" (look ruslanTable >=> look vws),
+        car_model <~ with tryField "Модель Автомобиля VW" (look vws),
         car_vin <~ field "VIN номер Автомобиля VW",
         cardNumber <~ tryField "№",
         manager <~ tryField "ФИО ответственного лица, внесшего данные в XLS файл",
         milageTO <~ tryField "Величина пробега на момент регистрации в Программе",
-        serviceInterval <~ tryField "Межсервисный интервал",
         validFrom <~ tryField "Дата прохождения ТО (Дата регистрации в программе)",
         validUntil <~ tryField "Программа действует до (Дата)",
         validUntilMilage <~ tryField "Программа действует до (Пробега)"]
-    where
-        ruslanTable :: M.Map Text Text
-        ruslanTable = M.unions [
-            syns "Caddy" ["Кэдди", "кедди", "Кедди"],
-            syns "Crafter" ["Крафтер"],
-            syns "Transporter" ["T5", "Т5", "Транспортер"],
-            syns "Tiguan" ["Тигуан", "тигуан"],
-            syns "Polo" ["Поло"],
-            syns "Touareg" ["Туарег", "Тouareg"],
-            syns "Passat" ["Пассат", "пассат", "Passft"],
-            syns "Jetta" ["Джетта"],
-            syns "Golf" ["Гольф", "гольф", "Гольф+"],
-            syns "Touran" ["Туран"],
-            syns "Phaeton" ["Фаэтон", "фаэтон"],
-            syns "Eos" ["Эос"],
-            syns "Scirocco" ["Сирокко"],
-            syns "Caravelle" ["Каравелла"],
-            syns "Multivan" ["Мультивен"],
-            syns "Sharan" ["Шаран"]]
-            where
-                syns :: Text -> [Text] -> M.Map Text Text
-                syns val keys = M.fromList $ zip keys (repeat val)
 
 chartis :: Dict Model
 chartis = do
