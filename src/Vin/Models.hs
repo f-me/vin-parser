@@ -143,11 +143,11 @@ car_warrantyStart = ("warrantyStart", time)
 cardNumber = ("cardNumber", text)
 cardOwner = ("cardOwner", text)
 manager = ("manager", text)
-milageTO = ("milageTO", text)
+milageTO = ("milageTO", int)
 program = ("program", text)
 validFrom = ("contractValidFromDate", time)
 validUntil = ("contractValidUntilDate", time)
-validUntilMilage = ("contractValidUntilMilage", time)
+validUntilMilage = ("contractValidUntilMilage", int)
 
 -- Fields not present in contract model
 -- car_motor = ("car_motor", text)
