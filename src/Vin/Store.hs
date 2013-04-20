@@ -21,6 +21,7 @@ import Data.Conduit.Util hiding (zip)
 import Data.CSV.Conduit hiding (Row, MapRow)
 
 import Data.Char (isSpace)
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -53,7 +54,7 @@ dbCreateVin cp val
         where
           dbCreateRow = do
             createInstance cp "contract" $ 
-                        M.fromList $ 
+                        HM.fromList $ 
                         map (T.encodeUtf8 *** T.encodeUtf8) $
                         M.toList val
             return ()
