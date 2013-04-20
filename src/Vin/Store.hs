@@ -94,43 +94,46 @@ storeCorrect
     -> (Int -> Int -> IO ())
     -> Conduit DataRowMaybeError m (DataRow, String)
 
-storeCorrect _ store stats = conduitIO
-    (newMVar (0, 0))
-    (const $ return ())
-    (\statsVar (src, r) -> case r of
-        -- No errors, save store row
-        Right (Nothing, dat) -> liftIO $ do
-            store dat
-            newUpload statsVar
-            return (IOProducing [])
-        -- Errors, skip parsed row and produce errors
-        Right (Just err, dat) -> liftIO $ do
-            newFail statsVar
-            return (IOProducing [(src, err)])
-        -- No parsed data, only error
-        Left e' -> liftIO $ do
-            newFail statsVar
-            return $ IOProducing [(src, e')])
-    (const $ return [])
-    where
+storeCorrect _ store stats =
+    let
+        allocate = newMVar (0, 0)
+        cleanup = const $ return ()
         updateStats m = readMVar m >>= uncurry stats
         newUpload m = modifyMVar_ m (return . (succ *** succ)) >> updateStats m
         newFail m = modifyMVar_ m (return . first succ) >> updateStats m
+    in
+      bracketP allocate cleanup $
+        \statsVar -> CL.mapMaybeM $
+          \(src, r) -> case r of
+            -- No errors, save store row
+            Right (Nothing, dat) -> liftIO $ do
+                store dat
+                newUpload statsVar
+                return Nothing
+            -- Errors, store parsed row and produce errors
+            Right (Just err, dat) -> liftIO $ do
+                store dat
+                newFail statsVar
+                return $ Just (src, err)
+            -- No parsed data, only error
+            Left e' -> liftIO $ do
+                newFail statsVar
+                return $ Just (src, e')
+
 
 storeErrorLog
     :: MonadResource m
     => FilePath
     -> Conduit (DataRow, String) m DataRow
-storeErrorLog fLog = conduitIO
+storeErrorLog fLog = bracketP
     (do
         hFile <- IO.openFile fLog IO.WriteMode
         IO.hSetEncoding hFile IO.utf8
         return hFile)
     IO.hClose
-    (\h (r, err) -> do
-        liftIO $ IO.hPutStrLn h err
-        return $ IOProducing [r])
-    (const $ return [])
+    (\h -> CL.mapM (\(r, err) -> do
+                      liftIO $ IO.hPutStrLn h err
+                      return r))
 
 writeIncorrect :: MonadResource m => FilePath -> Sink DataRow m ()
 writeIncorrect fp = do
@@ -146,4 +149,4 @@ writeRows fp
     =  (writeHeaders csvSettings >> fromCSV csvSettings)
     =$ sinkFile fp >> return fp
     where
-        csvSettings = defCSVSettings { csvOutputColSep = ';' }
+        csvSettings = defCSVSettings { csvSep = ';' }

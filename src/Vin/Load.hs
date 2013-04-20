@@ -14,7 +14,6 @@ import Data.Conduit.Binary
 import qualified Data.Conduit.List as CL
 import qualified Data.Map as M
 import Data.CSV.Conduit hiding (Row, MapRow)
-import Data.Conduit.Util hiding (zip)
 
 import qualified Codec.Xlsx.Parser as Xlsx
 
@@ -36,7 +35,7 @@ csv
     => FilePath
     -> Source m DataRowError
 csv f = sourceFile f $= intoCSV csvSettings $= CL.map dup $= safeMap decodeCP1251 where
-    csvSettings = defCSVSettings { csvSep = ';', csvOutputColSep = ';' }
+    csvSettings = defCSVSettings { csvSep = ';' }
 
 -- | Load XLSX
 xlsx
@@ -76,17 +75,14 @@ safeMap :: (MonadResource m, NFData b) => (a -> b) -> Conduit (DataError c a) m 
 safeMap f = safeMapM (Right . f)
 
 safeMapM :: (MonadResource m, NFData b) => (a -> Either String b) -> Conduit (DataError c a) m (DataError c b)
-safeMapM f = conduitIO
-    (return ())
-    (const $ return ())
-    (\() (r, i) -> case i of
-        Left x -> return $ IOProducing [(r, Left x)]
+safeMapM f = CL.mapM
+    (\(r, i) -> case i of
+        Left x -> return (r, Left x)
         Right v -> liftIO $ catch (produce f r v) (onError r))
-    (const $ return [])
     where
-        produce :: NFData b => (a -> Either String b) -> c -> a -> IO (ConduitIOResult (DataError c a) (DataError c b))
+        produce :: NFData b => (a -> Either String b) -> c -> a -> IO (DataError c b)
         produce f' r v = do
             v' <- evaluate $ force $ f' v
-            return $ IOProducing [(r, v')]
-        onError :: c -> SomeException -> IO (ConduitIOResult (DataError c a) (DataError c b))
-        onError r e = return $ IOProducing [(r, Left $ show e)]
+            return (r, v')
+        onError :: c -> SomeException -> IO (DataError c a)
+        onError r e = return $ (r, Left $ show e)
