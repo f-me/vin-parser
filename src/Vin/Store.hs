@@ -46,15 +46,17 @@ instance Exception VinUploadException
 
 dbCreateVin :: Int
             -- ^ CaRMa port.
+            -> ByteString
             -> Row 
             -> IO ()
-dbCreateVin cp val
+dbCreateVin cp owner val
     | M.member "carVin" val = dbCreateRow
     | otherwise = return ()
         where
           dbCreateRow = do
-            createInstance cp "contract" $ 
-                        HM.fromList $ 
+            createInstance cp "contract" $
+                        HM.insert "owner" owner $
+                        HM.fromList $
                         map (T.encodeUtf8 *** T.encodeUtf8) $
                         M.toList val
             return ()
