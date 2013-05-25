@@ -127,33 +127,35 @@ models = do
 
 -- Predefined fields
 
-car_buyDate = ("car_buyDate", time)
-car_checkupDate = ("car_checkupDate", time)
-car_checkupMileage = ("car_checkupMileage", int)
-car_color = ("car_color", text)
-car_make = ("car_make", text)
-car_makeYear = ("car_makeYear", int)
-car_model = ("car_model", text)
+car_buyDate = ("carBuyDate", time)
+car_checkupDate = ("carCheckupDate", time)
+car_checkupMileage = ("carCheckupMilage", int)
+car_color = ("carColor", text)
+car_make = ("carMake", text)
+car_makeYear = ("carMakeYear", int)
+car_model = ("carModel", text)
+car_plateNum = ("carPlateNum", text)
+car_seller = ("carSeller", text)
+car_transmission = ("carTransmission", text)
+car_vin = ("carVin", vin)
+car_warrantyEnd = ("warrantyEnd", time)
+car_warrantyStart = ("warrantyStart", time)
+cardNumber = ("cardNumber", text)
+cardOwner = ("cardOwner", text)
+manager = ("manager", text)
+milageTO = ("milageTO", int)
+program = ("program", text)
+validFrom = ("contractValidFromDate", time)
+validUntil = ("contractValidUntilDate", time)
+validUntilMilage = ("contractValidUntilMilage", int)
+
+-- Fields not present in contract model
 -- car_motor = ("car_motor", text)
-car_plateNum = ("car_plateNum", text)
-car_seller = ("car_seller", text)
-car_transmission = ("car_transmission", text)
-car_vin = ("car_vin", vin)
-car_warrantyEnd = ("car_warrantyEnd", time)
-car_warrantyStart = ("car_warrantyStart", time)
-cardNumber = ("cardNumber_cardNumber", text)
-cardOwner = ("cardNumber_cardOwner", text)
-manager = ("cardNumber_manager", text)
-milageTO = ("cardNumber_milageTO", text)
 modelCode = ("modelCode", text)
 ownerEmail = ("contact_ownerEmail", email)
 ownerName = ("contact_ownerName", text)
 ownerPhone = ("contact_ownerPhone1", text)
-program = ("program", text)
 serviceInterval = ("cardNumber_serviceInterval", int)
-validFrom = ("cardNumber_validFrom", time)
-validUntil = ("cardNumber_validUntil", time)
-validUntilMilage = ("cardNumber_validUntilMilage", time)
 
 -- Helpers
 
@@ -328,37 +330,14 @@ vwRuslan = do
     vws <- getCarModels "vw"
     return $ model "ruslan" [
         car_make <~ pure "vw",
-        car_model <~ with tryField "Модель Автомобиля VW" (look ruslanTable >=> look vws),
+        car_model <~ with tryField "Модель Автомобиля VW" (look vws),
         car_vin <~ field "VIN номер Автомобиля VW",
         cardNumber <~ tryField "№",
         manager <~ tryField "ФИО ответственного лица, внесшего данные в XLS файл",
         milageTO <~ tryField "Величина пробега на момент регистрации в Программе",
-        serviceInterval <~ tryField "Межсервисный интервал",
         validFrom <~ tryField "Дата прохождения ТО (Дата регистрации в программе)",
         validUntil <~ tryField "Программа действует до (Дата)",
         validUntilMilage <~ tryField "Программа действует до (Пробега)"]
-    where
-        ruslanTable :: M.Map Text Text
-        ruslanTable = M.unions [
-            syns "Caddy" ["Кэдди", "кедди", "Кедди"],
-            syns "Crafter" ["Крафтер"],
-            syns "Transporter" ["T5", "Т5", "Транспортер"],
-            syns "Tiguan" ["Тигуан", "тигуан"],
-            syns "Polo" ["Поло"],
-            syns "Touareg" ["Туарег", "Тouareg"],
-            syns "Passat" ["Пассат", "пассат", "Passft"],
-            syns "Jetta" ["Джетта"],
-            syns "Golf" ["Гольф", "гольф", "Гольф+"],
-            syns "Touran" ["Туран"],
-            syns "Phaeton" ["Фаэтон", "фаэтон"],
-            syns "Eos" ["Эос"],
-            syns "Scirocco" ["Сирокко"],
-            syns "Caravelle" ["Каравелла"],
-            syns "Multivan" ["Мультивен"],
-            syns "Sharan" ["Шаран"]]
-            where
-                syns :: Text -> [Text] -> M.Map Text Text
-                syns val keys = M.fromList $ zip keys (repeat val)
 
 chartis :: Dict Model
 chartis = do
