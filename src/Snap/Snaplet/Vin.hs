@@ -9,7 +9,6 @@ module Snap.Snaplet.Vin
     , initUploadState, uploadData, getState, removeAlert
     ) where
 
-import           Control.Applicative
 import           Control.Concurrent
 import qualified Control.Exception as E
 import           Control.Monad.IO.Class
@@ -18,7 +17,6 @@ import           Data.Map as M
 import           Data.Maybe
 import           GHC.Generics
 
-import           Control.Monad.CatchIO (finally, catch)
 import           Control.Monad.State
 import           Data.Aeson
 import           Data.Lens.Template
@@ -27,10 +25,9 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Snap.Core
+import           Snap.Http.Server.Config as S
 import           Snap.Snaplet
-import           Snap.Util.FileUploads
 import           System.FilePath
-import           System.Directory
 
 import           Vin.Import
 
@@ -102,87 +99,26 @@ withErrorFile a f = a { alertErrorFile = Just f }
 withErrorLogFile :: Alert a -> FilePath -> Alert a
 withErrorLogFile a f = a { alertErrorLogFile = Just f }
 
-------------------------------------------------------------------------------
--- | Upload file with VIN numbers.
-upload :: Handler b Vin ()
-upload = ifTop $ do
-    d <- liftIO $ getTemporaryDirectory
-    handleFileUploads d defaultUploadPolicy partUploadPolicy handler
-        `catch` (writeText . fileUploadExceptionReason)
-    where
-        partUploadPolicy _ = allowWithMaximumSize $ 2 ^ (30 :: Int)
-        
-        handler [] = writeBS "no files"
-        handler ((info, f):_) = do
-            program <- fromMaybe "" <$> getParam "program"
-            either
-                (writeText . policyViolationExceptionReason)
-                (action program info)
-                f
-
-action :: ByteString -> PartInfo -> String -> Handler b Vin ()
-action program info f = do
-    --liftIO $ createLink f f'
-    liftIO $ copyFile f fUploaded
-    s <- gets _alerts
-    liftIO $ do
-        alertInsert s $ infoAlert (T.pack f) "Uploading..." (T.decodeUtf8 partF)
-    
-    statsVar <- liftIO $ newMVar (0, 0)
-
-    let
-        uploadStats :: Int -> Int -> IO ()
-        uploadStats total valid = do
-            swapMVar statsVar (total, valid)
-            alertUpdate s $ infoAlert (T.pack f) msg (T.decodeUtf8 partF)
-            where
-                msg = T.concat [
-                    "Uploading... total rows processed: ",
-                    T.pack . show $ total,
-                    ", rows uploaded: ",
-                    T.pack . show $ valid]
-        
-    liftIO $ forkIO $ do
-        loadFile fUploaded fError fLog program (contentType . T.unpack . T.decodeUtf8 . partContentType $ info) uploadStats
-        `E.catches` [
-            E.Handler (\(ex :: VinUploadException) -> return ()),
-            E.Handler (\(ex :: E.SomeException) -> return ())]
-        `finally` (do
-            -- removeLink f'
-            (total, valid) <- readMVar statsVar
-            let
-                resultMessage = T.pack $ concat [
-                    "Done. Total rows processed: ",
-                    show total,
-                    ", rows uploaded: ",
-                    show valid]
-                doneAlert = alertUpdate s $ (successAlert (T.pack f) resultMessage (T.decodeUtf8 partF)
-                    `withErrorFile` fErrorLink
-                    `withErrorLogFile` fLogLink)
-            doneAlert)
-    
-    writeBS "Ok"
-    where
-        partF = fromMaybe "" $ partFileName info
-        unquote "" = ""
-        unquote s
-            | head s == '"' = init . tail $ s
-            | otherwise = s
-        partFs = unquote $ T.unpack $ T.decodeUtf8 partF
-        fError = "resources/static/" ++ partFs ++ ".error.csv"
-        fLog = "resources/static/" ++ partFs ++ ".error.log"
-        fErrorLink = "s/" ++ partFs ++ ".error.csv"
-        fLogLink = "s/" ++ partFs ++ ".error.log"
-        fUploaded = "resources" </> "static" </> addExtension "uploaded" (takeExtension . T.unpack . T.decodeUtf8 $ partF)
-        f' = f ++ "-link"
+-- | Obtain port number of the Snap application.
+currentPort :: IO Int
+currentPort = do
+  sCfg <- commandLineConfig (emptyConfig :: S.Config Snap a)
+  return $ case getPort sCfg of
+             Just n -> n
+             Nothing -> error "No port"
 
 initUploadState :: String -> Handler b Vin ()
 initUploadState f = do
     s <- gets _alerts
     liftIO $ alertInsert s $ infoAlert (T.pack f) "Uploading..." (T.pack f)
 
-uploadData :: String -> String -> Handler b Vin ()
-uploadData program f = do
+uploadData :: ByteString
+           -- ^ Owner field value.
+           -> String
+           -- ^ Program name.
+           -> String 
+           -> Handler b Vin ()
+uploadData owner program f = do
     s <- gets _alerts
     statsVar <- liftIO $ newMVar (0, 0)
 
@@ -214,8 +150,9 @@ uploadData program f = do
                 `withErrorFile` fErrorLink
                 `withErrorLogFile` fLogLink
 
-    liftIO $ forkIO
-        $ (loadFile fUploaded fError fLog (T.encodeUtf8 . T.pack $ program) (extension $ takeExtension fUploaded) uploadStats >> endWith Nothing)
+    carmaPort <- liftIO currentPort
+    liftIO $ forkIO $
+        (loadFile fUploaded fError fLog owner program (extension $ takeExtension fUploaded) uploadStats carmaPort >> endWith Nothing)
         `E.catches` [
             E.Handler (\(ex :: VinUploadException) -> endWith Nothing),
             E.Handler (\(ex :: E.SomeException) -> endWith (Just $ fromString $ show ex))]
@@ -247,7 +184,6 @@ removeAlert = do
 
 routes :: [(ByteString, Handler b Vin ())]
 routes = [
-    ("/upload", method POST upload),
     ("/state", method GET getState),
     ("/state", method POST removeAlert)]
 

@@ -212,7 +212,7 @@ instance FromField Time where
     fromField s = fmap TimePOSIX (fromField s) <|> fmap TimeLocal (fromField s)
 
 instance FromField Int where
-    fromField = fieldRead "число"
+    fromField = fieldRead "число" . T.takeWhile (/= '.')
 
 instance FromField Email where
     fromField s
