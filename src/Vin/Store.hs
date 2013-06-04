@@ -5,10 +5,11 @@ module Vin.Store (
     dbCreateVin, sinkXFile
     ) where
 
-import Control.Applicative
 import Control.Arrow
 import Control.Exception
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class
+import Control.Monad.Morph
+import Control.Monad.Trans.Resource
 import Control.Concurrent.MVar
 
 import Data.ByteString (ByteString)
@@ -17,13 +18,11 @@ import qualified Data.ByteString.Char8 as C8
 import Data.Conduit
 import Data.Conduit.Binary
 import qualified Data.Conduit.List as CL
-import Data.Conduit.Util hiding (zip)
 import Data.CSV.Conduit hiding (Row, MapRow)
 
 import Data.Char (isSpace)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as M
-import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T (encodeUtf8)
 import Data.Typeable
@@ -44,17 +43,15 @@ data VinUploadException = VinUploadException {
 
 instance Exception VinUploadException
 
-dbCreateVin :: Int
-            -- ^ CaRMa port.
-            -> ByteString
+dbCreateVin :: ByteString
             -> Row 
-            -> IO ()
-dbCreateVin cp owner val
+            -> ResourceT CarmaIO ()
+dbCreateVin owner val
     | M.member "carVin" val = dbCreateRow
     | otherwise = return ()
         where
           dbCreateRow = do
-            createInstance cp "contract" $
+            lift $ createInstance "contract" $
                         HM.insert "owner" owner $
                         HM.fromList $
                         map (T.encodeUtf8 *** T.encodeUtf8) $
@@ -77,10 +74,10 @@ trimKeys = M.mapKeys trim where
 
 sinkXFile
     :: MonadResource m
-    => (Row -> IO ())
+    => (Row -> m ())
     -> FilePath
     -> FilePath
-    -> (Int -> Int -> IO ())
+    -> (Int -> Int -> m ())
     -> Model
     -> Sink DataRowError m ()
 sinkXFile store fError fLog stats ml
@@ -93,33 +90,33 @@ sinkXFile store fError fLog stats ml
 storeCorrect
     :: MonadResource m
     => Model
-    -> (Row -> IO ())
-    -> (Int -> Int -> IO ())
+    -> (Row -> m ())
+    -> (Int -> Int -> m ())
     -> Conduit DataRowMaybeError m (DataRow, String)
 
 storeCorrect _ store stats =
     let
-        allocate = newMVar (0, 0)
+        alloc = newMVar (0, 0)
         cleanup = const $ return ()
-        updateStats m = readMVar m >>= uncurry stats
-        newUpload m = modifyMVar_ m (return . (succ *** succ)) >> updateStats m
-        newFail m = modifyMVar_ m (return . first succ) >> updateStats m
+        updateStats m = liftIO (readMVar m) >>= uncurry stats
+        newUpload m = liftIO (modifyMVar_ m (return . (succ *** succ))) >> updateStats m
+        newFail m = liftIO (modifyMVar_ m (return . first succ)) >> updateStats m
     in
-      bracketP allocate cleanup $
+      bracketP alloc cleanup $
         \statsVar -> CL.mapMaybeM $
           \(src, r) -> case r of
             -- No errors, save store row
-            Right (Nothing, dat) -> liftIO $ do
+            Right (Nothing, dat) -> do
                 store dat
                 newUpload statsVar
                 return Nothing
             -- Errors, store parsed row and produce errors
-            Right (Just err, dat) -> liftIO $ do
+            Right (Just err, dat) -> do
                 store dat
                 newFail statsVar
                 return $ Just (src, err)
             -- No parsed data, only error
-            Left e' -> liftIO $ do
+            Left e' -> do
                 newFail statsVar
                 return $ Just (src, e')
 

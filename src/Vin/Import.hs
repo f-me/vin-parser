@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+
 module Vin.Import (
     VinUploadException(..),
     ContentType,
@@ -7,12 +10,15 @@ module Vin.Import (
     ) where
 
 import Control.Exception (throw)
+import Control.Monad.IO.Class
 
 import Data.ByteString (ByteString)
 import Data.Conduit
 import qualified Data.Map as M
 
 import qualified Data.Text as T (pack)
+
+import Carma.HTTP
 
 import Vin.Model
 import Vin.Models (models, runDict)
@@ -52,20 +58,20 @@ importData
     -- ^ Program name
     -> ContentType
     -- ^ Content type
-    -> (Int -> Int -> IO ())
+    -> (Int -> Int -> ResourceT CarmaIO ())
     -- ^ Progress
     -> Int
     -- ^ CaRMa port.
     -> IO ()
 
 importData ms from failed errors owner program content stats cp = do
-    loader <- try (either (`M.lookup` loadersContentType) (`M.lookup` loadersExtension) content) "Unknown loader"
+    loader <- liftIO $ try (either (`M.lookup` loadersContentType) (`M.lookup` loadersExtension) content) "Unknown loader"
     -- loader <- try (M.lookup content ls) $ "Unknown loader"
-    m <- try (ms program) $ "Unknown program"
-    l <- loader from
-    runResourceT $ (l $$ sinkXFile (dbCreateVin cp owner) failed errors stats m)
+    m <- liftIO $ try (ms program) $ "Unknown program"
+    l <- liftIO $ loader from
+    runCarma defaultCarmaOptions{carmaPort = cp} $ runResourceT $ (l $$ sinkXFile (dbCreateVin owner) failed errors stats m)
 
-loadFile :: FilePath -> FilePath -> FilePath -> ByteString -> String -> ContentType -> (Int -> Int -> IO ()) -> Int -> IO ()
+loadFile :: FilePath -> FilePath -> FilePath -> ByteString -> String -> ContentType -> (Int -> Int -> ResourceT CarmaIO ()) -> Int -> IO ()
 loadFile iFile eFile lFile owner pName cType stats cp = do
     models' <- runDict models
     models'' <- try models' $ "Unable to load models"

@@ -12,6 +12,7 @@ module Snap.Snaplet.Vin
 import           Control.Concurrent
 import qualified Control.Exception as E
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Resource
 import           Data.ByteString (ByteString)
 import           Data.Map as M
 import           Data.Maybe
@@ -28,6 +29,8 @@ import           Snap.Core
 import           Snap.Http.Server.Config as S
 import           Snap.Snaplet
 import           System.FilePath
+
+import           Carma.HTTP (CarmaIO)
 
 import           Vin.Import
 
@@ -123,8 +126,8 @@ uploadData owner program f = do
     statsVar <- liftIO $ newMVar (0, 0)
 
     let
-        uploadStats :: Int -> Int -> IO ()
-        uploadStats total valid = do
+        uploadStats :: Int -> Int -> ResourceT CarmaIO ()
+        uploadStats total valid = liftIO $ do
             swapMVar statsVar (total, valid)
             alertUpdate s $ infoAlert (T.pack f) msg (T.pack f)
             where
