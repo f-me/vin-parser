@@ -1,6 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-
 module Vin.Import (
     VinUploadException(..),
     ContentType,
