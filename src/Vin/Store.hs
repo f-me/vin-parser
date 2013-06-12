@@ -44,15 +44,17 @@ data VinUploadException = VinUploadException {
 instance Exception VinUploadException
 
 dbCreateVin :: ByteString
+            -> ByteString
             -> Row 
             -> ResourceT CarmaIO ()
-dbCreateVin owner val
+dbCreateVin owner programRef val
     | M.member "carVin" val = dbCreateRow
     | otherwise = return ()
         where
           dbCreateRow = do
             lift $ createInstance "contract" $
                         HM.insert "owner" owner $
+                        HM.insert "program" programRef $
                         HM.fromList $
                         map (T.encodeUtf8 *** T.encodeUtf8) $
                         M.toList val

@@ -117,11 +117,13 @@ initUploadState f = do
 
 uploadData :: ByteString
            -- ^ Owner field value.
+           -> ByteString
+           -- ^ Parent program reference (@program:12@).
            -> String
-           -- ^ Program name.
+           -- ^ Vin format name.
            -> String 
            -> Handler b Vin ()
-uploadData owner program f = do
+uploadData owner program vinFormat f = do
     s <- gets _alerts
     statsVar <- liftIO $ newMVar (0, 0)
 
@@ -155,7 +157,7 @@ uploadData owner program f = do
 
     carmaPort <- liftIO currentPort
     liftIO $ forkIO $
-        (loadFile fUploaded fError fLog owner program (extension $ takeExtension fUploaded) uploadStats carmaPort >> endWith Nothing)
+        (loadFile fUploaded fError fLog owner program vinFormat (extension $ takeExtension fUploaded) uploadStats carmaPort >> endWith Nothing)
         `E.catches` [
             E.Handler (\(ex :: VinUploadException) -> endWith Nothing),
             E.Handler (\(ex :: E.SomeException) -> endWith (Just $ fromString $ show ex))]

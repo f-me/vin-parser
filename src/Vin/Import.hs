@@ -42,7 +42,7 @@ extension = Right
 -- TODO: Move to import
 importData
     :: (String -> Maybe Model)
-    -- ^ Models
+    -- ^ Lookup program by its name.
     -> FilePath
     -- ^ Input file
     -> FilePath
@@ -51,8 +51,10 @@ importData
     -- ^ Log file
     -> ByteString
     -- ^ Owner field value
-    -> String
+    -> ByteString
     -- ^ Program name
+    -> String
+    -- ^ VIN file format name.
     -> ContentType
     -- ^ Content type
     -> (Int -> Int -> ResourceT CarmaIO ())
@@ -61,15 +63,15 @@ importData
     -- ^ CaRMa port.
     -> IO ()
 
-importData ms from failed errors owner program content stats cp = do
+importData ms from failed errors owner program vinFormat content stats cp = do
     loader <- liftIO $ try (either (`M.lookup` loadersContentType) (`M.lookup` loadersExtension) content) "Unknown loader"
     -- loader <- try (M.lookup content ls) $ "Unknown loader"
-    m <- liftIO $ try (ms program) $ "Unknown program"
+    m <- liftIO $ try (ms vinFormat) $ "Unknown program"
     l <- liftIO $ loader from
-    runCarma defaultCarmaOptions{carmaPort = cp} $ runResourceT $ (l $$ sinkXFile (dbCreateVin owner) failed errors stats m)
+    runCarma defaultCarmaOptions{carmaPort = cp} $ runResourceT $ (l $$ sinkXFile (dbCreateVin owner program) failed errors stats m)
 
-loadFile :: FilePath -> FilePath -> FilePath -> ByteString -> String -> ContentType -> (Int -> Int -> ResourceT CarmaIO ()) -> Int -> IO ()
-loadFile iFile eFile lFile owner pName cType stats cp = do
+loadFile :: FilePath -> FilePath -> FilePath -> ByteString -> ByteString -> String -> ContentType -> (Int -> Int -> ResourceT CarmaIO ()) -> Int -> IO ()
+loadFile iFile eFile lFile owner pName vinFormat cType stats cp = do
     models' <- runDict models
     models'' <- try models' $ "Unable to load models"
-    importData models'' iFile eFile lFile owner pName cType stats cp
+    importData models'' iFile eFile lFile owner pName vinFormat cType stats cp
