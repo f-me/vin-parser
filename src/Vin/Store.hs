@@ -55,6 +55,7 @@ dbCreateVin owner programRef val
             lift $ createInstance "contract" $
                         HM.insert "owner" owner $
                         HM.insert "program" programRef $
+                        HM.insert "dixi" "1" $
                         HM.fromList $
                         map (T.encodeUtf8 *** T.encodeUtf8) $
                         M.toList val
