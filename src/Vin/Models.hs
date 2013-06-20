@@ -17,7 +17,6 @@ import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (sequenceA)
-import System.FilePath
 
 import Vin.Field
 import Vin.Model

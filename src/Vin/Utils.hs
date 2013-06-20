@@ -4,8 +4,6 @@ module Vin.Utils (
     ) where
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as B
-import qualified Data.ByteString.Lazy as L
 
 import Data.Encoding (decodeStrictByteString, encodeStrictByteString)
 import Data.Encoding.CP1251
