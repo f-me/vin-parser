@@ -1,5 +1,5 @@
 Name:                vin-parser
-Version:             0.6
+Version:             0.6.1
 Synopsis:            Custom tool for importing VIN files to CaRMa.
 License:             BSD3
 Author:              Alexandr `voidex` Ruchkin

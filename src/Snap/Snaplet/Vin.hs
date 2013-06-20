@@ -121,9 +121,10 @@ uploadData :: ByteString
            -- ^ Parent program reference (@program:12@).
            -> String
            -- ^ Vin format name.
-           -> String 
+           -> FilePath
+           -- ^ Path to a VIN data file.
            -> Handler b Vin ()
-uploadData owner program vinFormat f = do
+uploadData owner program vinFormat fUploaded = do
     s <- gets _alerts
     statsVar <- liftIO $ newMVar (0, 0)
 
@@ -168,12 +169,12 @@ uploadData owner program vinFormat f = do
         unquote s
             | head s == '"' = init . tail $ s
             | otherwise = s
+        f = takeFileName fUploaded
         partFs = unquote f
         fError = "resources" </> "static" </> (partFs ++ ".error.csv")
         fLog = "resources" </> "static" </> (partFs ++ ".error.log")
         fErrorLink = "s/" ++ partFs ++ ".error.csv"
         fLogLink = "s/" ++ partFs ++ ".error.log"
-        fUploaded = "resources" </> "static" </> "fileupload" </> "report" </> "upload" </> "data" </> f
 
 getState :: Handler b Vin ()
 getState = do
