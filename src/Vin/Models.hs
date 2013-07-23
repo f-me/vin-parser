@@ -453,6 +453,7 @@ universalFieldsCommon = do
     , car_makeYear <~ tryField "Год производства автомобиля"
     , car_model <~ modelFld "Марка" "Модель"
     , car_plateNum <~ tryField "Госномер"
+    , cardNumber <~ tryField "Номер карты участника"
     , cardOwner <~ tryField "ФИО владельца карты"
     , manager <~ tryField "ФИО менеджера"
     , milageTO <~ tryField "Пробег при регистрации в программе"
@@ -468,11 +469,10 @@ universalFieldsCommon = do
 universal :: Dict (String -> Model)
 universal = do
     com <- universalFieldsCommon
-    return $ \p -> model p $ 
+    return $ \p -> model p $
                    com ++
                    [ car_vin <~ field "VIN"
-                   , cardNumber <~ tryField "Номер карты участника"
                    ]
 
 vtb24 :: Dict Model
-vtb24 =  model "vtb24" <$> universalFieldsCommon
+vtb24 = model "vtb24" <$> universalFieldsCommon
