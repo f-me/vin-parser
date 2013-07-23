@@ -118,6 +118,7 @@ models = do
         autocraft,
         europlan,
         b2c,
+        vtb24,
         citroenPeugeot "citroen",
         citroenPeugeot "peugeot"]
     u <- universal
@@ -439,27 +440,39 @@ citroenPeugeot progname = do
         car_warrantyEnd <~ tryField "VALID_TO",
         car_warrantyStart <~ tryField "VALID_FROM"]
 
+-- | A common set for field mappings utilized by universal format.
+universalFieldsCommon :: Dict [(String, Field Text)]
+universalFieldsCommon = do
+  (makeFld, modelFld) <- makeModelParser
+  cols <- asks colorsDict
+  return $
+    [ car_buyDate <~ tryField "Дата покупки"
+    , car_checkupDate <~ tryField "Дата последнего ТО"
+    , car_color <~ tableField cols "Цвет"
+    , car_make <~ makeFld "Марка"
+    , car_makeYear <~ tryField "Год производства автомобиля"
+    , car_model <~ modelFld "Марка" "Модель"
+    , car_plateNum <~ tryField "Госномер"
+    , cardOwner <~ tryField "ФИО владельца карты"
+    , manager <~ tryField "ФИО менеджера"
+    , milageTO <~ tryField "Пробег при регистрации в программе"
+    , ownerEmail <~ tryField "Email владельца"
+    , ownerName <~ tryField "ФИО владельца"
+    , ownerPhone <~ tryField "Контактный телефон владельца"
+    , serviceInterval <~ tryField "Межсервисный интервал"
+    , validFrom <~ tryField "Дата регистрации в программе"
+    , validUntil <~ tryField "Программа действует до (дата)"
+    , validUntilMilage <~ tryField "Программа действует до (пробег)"
+    ]
+
 universal :: Dict (String -> Model)
 universal = do
-    (makeFld, modelFld) <- makeModelParser
-    cols <- asks colorsDict
-    return $ \p -> model p [
-        car_buyDate <~ tryField "Дата покупки",
-        car_checkupDate <~ tryField "Дата последнего ТО",
-        car_color <~ tableField cols "Цвет",
-        car_make <~ makeFld "Марка",
-        car_makeYear <~ tryField "Год производства автомобиля",
-        car_model <~ modelFld "Марка" "Модель",
-        car_plateNum <~ tryField "Госномер",
-        car_vin <~ field "VIN",
-        cardNumber <~ tryField "Номер карты участника",
-        cardOwner <~ tryField "ФИО владельца карты",
-        manager <~ tryField "ФИО менеджера",
-        milageTO <~ tryField "Пробег при регистрации в программе",
-        ownerEmail <~ tryField "Email владельца",
-        ownerName <~ tryField "ФИО владельца",
-        ownerPhone <~ tryField "Контактный телефон владельца",
-        serviceInterval <~ tryField "Межсервисный интервал",
-        validFrom <~ tryField "Дата регистрации в программе",
-        validUntil <~ tryField "Программа действует до (дата)",
-        validUntilMilage <~ tryField "Программа действует до (пробег)"]
+    com <- universalFieldsCommon
+    return $ \p -> model p $ 
+                   com ++
+                   [ car_vin <~ field "VIN"
+                   , cardNumber <~ tryField "Номер карты участника"
+                   ]
+
+vtb24 :: Dict Model
+vtb24 =  model "vtb24" <$> universalFieldsCommon
