@@ -47,24 +47,15 @@ dbCreateVin :: ByteString
             -> ByteString
             -> Row 
             -> ResourceT CarmaIO ()
-dbCreateVin owner programRef val
-    | M.member "carVin" val = dbCreateRow
-    | otherwise = return ()
-        where
-          dbCreateRow = do
-            lift $ createInstance "contract" $
-                        HM.insert "owner" owner $
-                        HM.insert "program" programRef $
-                        HM.insert "dixi" "1" $
-                        HM.fromList $
-                        map (T.encodeUtf8 *** T.encodeUtf8) $
-                        M.toList val
-            return ()
-        --     sets = mapM_ (\k -> redisSetWithKey' (key k) val) vins
-        --     -- It seems that car can have several keys
-        --     -- Duplicate as temporary solution
-        --     vins = T.words $ val M.! car_vin
-        --     key k = T.concat ["vin:", k]
+dbCreateVin owner programRef val = do
+  lift $ createInstance "contract" $
+         HM.insert "owner" owner $
+         HM.insert "program" programRef $
+         HM.insert "dixi" "1" $
+         HM.fromList $
+         map (T.encodeUtf8 *** T.encodeUtf8) $
+         M.toList val
+  return ()
 
 parseRow :: Model -> DataRow -> (Maybe String, Row)
 parseRow m r = case parse m $ decodeRow r of
