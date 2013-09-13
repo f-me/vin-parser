@@ -323,7 +323,8 @@ cadillac = do
         car_make <~ pure "cad",
         car_model <~ with (secondWord . tryField) "Model" (look cads),
         car_seller <~ tryField "Retail Dealer",
-        car_vin <~ field "VIN RUS"]
+        car_vin <~ field "VIN RUS",
+        cardNumber <~ tryField "Номер карты"]
 
 vwRuslan :: Dict Model
 vwRuslan = do
