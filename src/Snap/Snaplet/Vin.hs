@@ -18,9 +18,9 @@ import           Data.Map as M
 import           Data.Maybe
 import           GHC.Generics
 
+import           Control.Lens
 import           Control.Monad.State
 import           Data.Aeson
-import           Data.Lens.Template
 import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -64,7 +64,7 @@ deleteAlert k (Alerts m) = Alerts $ M.delete k m
 data Vin = Vin {
     _alerts :: MVar (Alerts Text) }
 
-makeLens ''Vin
+makeLenses ''Vin
 
 withAlerts :: MVar a -> (a -> a) -> IO ()
 withAlerts m f = modifyMVar_ m (return . f)
