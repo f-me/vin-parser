@@ -30,9 +30,9 @@ dictionaries = "resources/site-config/dictionaries/CarModels.json"
 makers :: FilePath
 makers = "resources/site-config/dictionaries/CarMakers.json"
 
--- | Dictionary with programs
-programs :: FilePath
-programs = "resources/site-config/dictionaries/Programs.json"
+-- | Dictionary with formats
+formats :: FilePath
+formats = "resources/site-config/dictionaries/VinFormats.json"
 
 -- | Dictionary with colors
 colors :: FilePath
@@ -44,8 +44,8 @@ data CarDictionaries = CarDictionaries {
     -- ^ @Map@ from maker label to maker value
     modelsDict :: M.Map Text (M.Map Text Text),
     -- ^ @Map@ from maker value to @Map@ from model label to model value
-    programsList :: [String],
-    -- ^ List of programs
+    formatsList :: [String],
+    -- ^ List of formats
     colorsDict :: M.Map Text Text }
     -- ^ @Map@ from color label to color value
 
@@ -83,7 +83,7 @@ runWithDicts fm fc fp fcl act = do
 
 -- | Run with default dictionaries
 runDict :: Dict a -> IO (Maybe a)
-runDict = runWithDicts makers dictionaries programs colors
+runDict = runWithDicts makers dictionaries formats colors
 
 -- | Get car models @Map@ from label to value for maker specified
 getCarModels :: Text -> Dict (M.Map Text Text)
@@ -122,8 +122,8 @@ models = do
         citroenPeugeot "citroen",
         citroenPeugeot "peugeot"]
     u <- universal
-    ps <- asks programsList
-    return $ \p -> find ((== p) . modelProgram) m <|> fmap u (find (== p) ps)
+    fs <- asks formatsList
+    return $ \p -> find ((== p) . modelProgram) m <|> fmap u (find (== p) fs)
 
 -- Predefined fields
 
