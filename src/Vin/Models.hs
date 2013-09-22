@@ -127,8 +127,8 @@ models = do
 
 -- Predefined fields
 
-car_buyDate = ("carBuyDate", time)
-car_checkupDate = ("carCheckupDate", time)
+car_buyDate = ("carBuyDate", day)
+car_checkupDate = ("carCheckupDate", day)
 car_checkupMileage = ("carCheckupMilage", int)
 car_color = ("carColor", text)
 car_make = ("carMake", text)
@@ -138,15 +138,15 @@ car_plateNum = ("carPlateNum", text)
 car_seller = ("carSeller", text)
 car_transmission = ("carTransmission", text)
 car_vin = ("carVin", vin)
-car_warrantyEnd = ("warrantyEnd", time)
-car_warrantyStart = ("warrantyStart", time)
+car_warrantyEnd = ("warrantyEnd", day)
+car_warrantyStart = ("warrantyStart", day)
 cardNumber = ("cardNumber", text)
 cardOwner = ("cardOwner", text)
 manager = ("manager", text)
 milageTO = ("milageTO", int)
 program = ("program", text)
-validFrom = ("contractValidFromDate", time)
-validUntil = ("contractValidUntilDate", time)
+validFrom = ("contractValidFromDate", day)
+validUntil = ("contractValidUntilDate", day)
 validUntilMilage = ("contractValidUntilMilage", int)
 
 -- Fields not present in contract model

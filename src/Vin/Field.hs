@@ -14,7 +14,7 @@ module Vin.Field (
 
     -- * Verify and postprocess fields
     FieldType,
-    text, time, timeAt, int, email, vin,
+    text, time, timeAt, day, int, email, vin,
 
     -- * Converters
     posix, posixZoned, look,
@@ -175,6 +175,9 @@ type FieldType a = a -> Text
 instance FromField Text where
     fromField = Right
 
+instance FromField Day where
+    fromField s = localDay <$> fromField s
+
 -- | Dublin Julian time used in xlsx
 instance FromField POSIXTime where
     fromField = fmap toPOSIX . fieldRead "время" where
@@ -244,6 +247,9 @@ instance FromField VIN where
 -- | Text field type
 text :: FieldType Text
 text = id
+
+day :: FieldType Day
+day = T.pack . showGregorian
 
 -- | Time field
 data Time = TimePOSIX POSIXTime | TimeLocal LocalTime
