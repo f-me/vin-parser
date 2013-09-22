@@ -319,12 +319,12 @@ cadillac :: Dict Model
 cadillac = do
     cads <- getCarModels "cad"
     return $ model "cadold" [
-        car_buyDate <~ tryField "Retail Date",
+        car_buyDate <~ field "Retail Date",
         car_make <~ pure "cad",
-        car_model <~ with (secondWord . tryField) "Model" (look cads),
-        car_seller <~ tryField "Retail Dealer",
+        car_model <~ with (secondWord . field) "Model" (look cads),
+        car_seller <~ field "Retail Dealer",
         car_vin <~ field "VIN RUS",
-        cardNumber <~ tryField "Номер карты"]
+        cardNumber <~ field "Номер карты"]
 
 vwRuslan :: Dict Model
 vwRuslan = do
