@@ -18,6 +18,7 @@ import Data.CSV.Conduit hiding (Row, MapRow)
 import qualified Codec.Xlsx.Parser as Xlsx
 
 import qualified Data.Text.Encoding as T
+import Data.Text.ICU.Convert as ICU
 
 import Vin.Field (Row)
 import Vin.Utils
@@ -34,8 +35,11 @@ csv
     :: MonadResource m
     => FilePath
     -> Source m DataRowError
-csv f = sourceFile f $= intoCSV csvSettings $= CL.map dup $= safeMap decodeCP1251 where
-    csvSettings = defCSVSettings { csvSep = ';' }
+csv f = do
+  let csvSettings = defCSVSettings { csvSep = ';' }
+  conv <- liftIO $ ICU.open "cp1251" Nothing
+  sourceFile f $= intoCSV csvSettings $= CL.map dup $= safeMap (decodeICU conv) where
+  
 
 -- | Load XLSX
 xlsx

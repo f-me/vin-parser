@@ -1,5 +1,5 @@
 Name:                vin-parser
-Version:             0.7.1
+Version:             0.7.1.1
 Synopsis:            Library for importing vendor-specific VIN files to CaRMa.
 License:             BSD3
 Author:              Alexandr `voidex` Ruchkin
@@ -19,7 +19,6 @@ Library
     Vin.Model
     Vin.Models
     Vin.Models.Cars
-    Vin.Utils
     Vin.Load
     Vin.Store
     Vin.Import
@@ -35,7 +34,6 @@ Library
     containers                  >= 0.4 && < 0.6,
     csv-conduit                 == 0.5.*,
     directory                   == 1.2.*,
-    encoding                    == 0.6.*,
     filepath                    == 1.3.*,
     ghc-prim                    == 0.3.*,
     email-validate              == 0.2.*,
@@ -50,6 +48,7 @@ Library
     snap-core                   == 0.9.*,
     snap-server                 == 0.9.*,
     text                        >= 0.11 && < 0.12,
+    text-icu                    == 0.6.*,
     time                        >= 1.4 && < 1.5,
     transformers                >= 0.2 && < 0.4,
     unordered-containers        == 0.2.*,

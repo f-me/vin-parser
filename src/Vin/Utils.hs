@@ -1,27 +1,22 @@
-module Vin.Utils (
-    DataRow,
-    encodeCP1251, decodeCP1251
-    ) where
+module Vin.Utils
+    ( DataRow
+    , decodeICU
+    )
+
+where
 
 import Data.ByteString (ByteString)
 
-import Data.Encoding (decodeStrictByteString, encodeStrictByteString)
-import Data.Encoding.CP1251
-import Data.Encoding.UTF8
-
 import qualified Data.Map as M
+
+import Data.Text.ICU.Convert
+import Data.Text.Encoding as T
 
 type DataRow = M.Map ByteString ByteString
 
-encodeCP1251 :: DataRow -> DataRow
-encodeCP1251 m = M.map enc m'
+-- | Decode a row to UTF-8 using an ICU input converter.
+decodeICU :: Converter -> DataRow -> DataRow
+decodeICU c m = M.map enc m'
   where
     m' = M.mapKeys enc m
-    enc = encodeStrictByteString CP1251 . decodeStrictByteString UTF8
-
-decodeCP1251 :: DataRow -> DataRow
-decodeCP1251 m = M.map enc m'
-  where
-    m' = M.mapKeys enc m
-    enc =  encodeStrictByteString UTF8 . decodeStrictByteString CP1251
-
+    enc =  T.encodeUtf8 . toUnicode c 
