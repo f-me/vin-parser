@@ -19,6 +19,7 @@ Library
     Vin.Model
     Vin.Models
     Vin.Models.Cars
+    Vin.Utils
     Vin.Load
     Vin.Store
     Vin.Import
